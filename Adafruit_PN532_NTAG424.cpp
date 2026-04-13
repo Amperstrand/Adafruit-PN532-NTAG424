@@ -58,6 +58,19 @@
 /**************************************************************************/
 
 #include "Adafruit_PN532_NTAG424.h"
+#if defined(ARDUINO_ARCH_ESP32)
+#include <SPI.h>
+static void pn532_spi_full_duplex(Adafruit_SPIDevice *dev,
+                                   uint8_t *tx, uint8_t tx_len,
+                                   uint8_t *rx, uint8_t rx_len) {
+  dev->beginTransaction();
+  SPI.transferBytes(tx, rx, tx_len);
+  for (uint8_t i = tx_len; i < rx_len; i++) {
+    rx[i] = SPI.transfer(0xFF);
+  }
+  dev->endTransaction();
+}
+#endif
 
 Arduino_CRC32 crc32; ///< Arduino CRC32 Class
 
@@ -95,7 +108,7 @@ byte pn532_packetbuffer[PN532_PACKBUFFSIZ]; ///< Packet buffer used in various
 Adafruit_PN532::Adafruit_PN532(uint8_t clk, uint8_t miso, uint8_t mosi,
                                uint8_t ss) {
   _cs = ss;
-  spi_dev = new Adafruit_SPIDevice(ss, clk, miso, mosi, 500000,
+  spi_dev = new Adafruit_SPIDevice(ss, clk, miso, mosi, 100000,
                                    SPI_BITORDER_LSBFIRST, SPI_MODE0);
 }
 
@@ -1659,7 +1672,7 @@ uint8_t Adafruit_PN532::ntag424_encrypt(uint8_t *key, uint8_t *iv,
   mbedtls_aes_context ctx;
   mbedtls_aes_init(&ctx);
   // Set the key for the AES context
-  if (mbedtls_aes_setkey_dec(&ctx, key, 128) != 0) {
+  if (mbedtls_aes_setkey_enc(&ctx, key, 128) != 0) {
     // Error setting key
     mbedtls_aes_free(&ctx);
     return 0;
@@ -3326,8 +3339,15 @@ bool Adafruit_PN532::readack() {
   uint8_t ackbuff[6];
 
   if (spi_dev) {
+#if defined(ARDUINO_ARCH_ESP32)
+    uint8_t tx[1] = {PN532_SPI_DATAREAD};
+    uint8_t rx[7] = {0};
+    pn532_spi_full_duplex(spi_dev, tx, 1, rx, 7);
+    memcpy(ackbuff, rx + 1, 6);
+#else
     uint8_t cmd = PN532_SPI_DATAREAD;
     spi_dev->write_then_read(&cmd, 1, ackbuff, 6);
+#endif
   } else if (i2c_dev || ser_dev) {
     readdata(ackbuff, 6);
   }
@@ -3342,11 +3362,17 @@ bool Adafruit_PN532::readack() {
 /**************************************************************************/
 bool Adafruit_PN532::isready() {
   if (spi_dev) {
-    // SPI ready check via Status Request
+#if defined(ARDUINO_ARCH_ESP32)
+    uint8_t tx[1] = {PN532_SPI_STATREAD};
+    uint8_t rx[2] = {0};
+    pn532_spi_full_duplex(spi_dev, tx, 1, rx, 2);
+    return rx[1] == PN532_SPI_READY;
+#else
     uint8_t cmd = PN532_SPI_STATREAD;
     uint8_t reply;
     spi_dev->write_then_read(&cmd, 1, &reply, 1);
     return reply == PN532_SPI_READY;
+#endif
   } else if (i2c_dev) {
     // I2C ready check via reading RDY byte
     uint8_t rdy[1];
@@ -3396,9 +3422,15 @@ bool Adafruit_PN532::waitready(uint16_t timeout) {
 /**************************************************************************/
 void Adafruit_PN532::readdata(uint8_t *buff, uint8_t n) {
   if (spi_dev) {
-    // SPI read
+#if defined(ARDUINO_ARCH_ESP32)
+    uint8_t tx[1] = {PN532_SPI_DATAREAD};
+    uint8_t rx[65] = {0};
+    pn532_spi_full_duplex(spi_dev, tx, 1, rx, n + 1);
+    memcpy(buff, rx + 1, n);
+#else
     uint8_t cmd = PN532_SPI_DATAREAD;
     spi_dev->write_then_read(&cmd, 1, buff, n);
+#endif
   } else if (i2c_dev) {
     // I2C read
     uint8_t rbuff[n + 1]; // +1 for leading RDY byte
