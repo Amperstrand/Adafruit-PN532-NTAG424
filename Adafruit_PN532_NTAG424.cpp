@@ -59,16 +59,14 @@
 
 #include "Adafruit_PN532_NTAG424.h"
 #if defined(ARDUINO_ARCH_ESP32)
-#include <SPI.h>
 static void pn532_spi_full_duplex(Adafruit_SPIDevice *dev,
                                    uint8_t *tx, uint8_t tx_len,
                                    uint8_t *rx, uint8_t rx_len) {
-  dev->beginTransaction();
-  SPI.transferBytes(tx, rx, tx_len);
-  for (uint8_t i = tx_len; i < rx_len; i++) {
-    rx[i] = SPI.transfer(0xFF);
-  }
-  dev->endTransaction();
+  uint8_t buf[70];
+  memcpy(buf, tx, tx_len);
+  memset(buf + tx_len, 0xFF, rx_len - tx_len);
+  dev->write_and_read(buf, rx_len);
+  memcpy(rx, buf, rx_len);
 }
 #endif
 
