@@ -12,7 +12,7 @@ grep -n "PrintHex" aescmac.cpp aescmac.h Adafruit_PN532_NTAG424.cpp || true
 echo
 
 cpp_defs=$(grep -c "^[[:space:]]*void[[:space:]]\+PrintHex[[:space:]]*(" aescmac.cpp)
-main_defs=$(grep -c "^[[:space:]]*void[[:space:]]\+PrintHex[[:space:]]*(" Adafruit_PN532_NTAG424.cpp)
+main_defs=$(grep -c "^[[:space:]]*void[[:space:]]\+Adafruit_PN532::PrintHex[[:space:]]*(" Adafruit_PN532_NTAG424.cpp)
 header_decls=$(grep -c "^[[:space:]]*void[[:space:]]\+PrintHex[[:space:]]*(" aescmac.h)
 
 if [ "$cpp_defs" -gt 0 ] && [ "$main_defs" -gt 0 ]; then
