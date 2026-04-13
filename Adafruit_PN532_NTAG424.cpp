@@ -1329,10 +1329,18 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     uint8_t *cla, uint8_t *ins, uint8_t *p1, uint8_t *p2, uint8_t *cmd_header,
     uint8_t cmd_header_length, uint8_t *cmd_data, uint8_t cmd_data_length,
     uint8_t le, uint8_t comm_mode, uint8_t *response, uint8_t response_le) {
+  if ((comm_mode == NTAG424_COMM_MODE_MAC ||
+       comm_mode == NTAG424_COMM_MODE_FULL) &&
+      !ntag424_Session.authenticated) {
+    return 0;
+  }
+#ifdef NTAG424DEBUG
   Serial.print("cmd_counter: ");
   Serial.println(ntag424_Session.cmd_counter);
+#endif
   uint8_t apdusize = (8 + (7 + cmd_header_length + cmd_data_length + 2)) & 0xff;
-  uint8_t apdu[apdusize];
+  uint8_t apdu[80]; // max APDU size per NTAG424 spec
+  if (apdusize > sizeof(apdu)) return 0;
   uint8_t offset = 0;
   apdu[0] = PN532_COMMAND_INDATAEXCHANGE;
   apdu[1] = 0x01;
@@ -1373,7 +1381,7 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
 #endif
     uint8_t cmac_short[8];
     uint8_t padded_payload_length = 16 + cmd_data_length;
-    uint8_t payload_padded[padded_payload_length];
+    uint8_t payload_padded[80]; // max padded payload per NTAG424 spec
     if (cmd_data_length > 0) {
       // Add padding to the cmddata
       memcpy(payload_padded, cmd_data, cmd_data_length);
@@ -1497,6 +1505,7 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
 #endif
 
     uint8_t *checkmacin = (uint8_t *)malloc(response_length + 6);
+    if (!checkmacin) return 0;
     uint8_t maclength = 0;
     checkmacin[0] = response[response_length - 1];
     checkmacin[1] = ntag424_Session.cmd_counter & 0xff;
@@ -1505,6 +1514,7 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
            NTAG424_AUTHRESPONSE_TI_SIZE);
     uint8_t padded_respdata_length = 0;
     uint8_t *respdata = (uint8_t *)malloc(response_length - 10);
+    if (!respdata) { free(checkmacin); return 0; }
     if (response_length > 10) {
       memcpy(respdata, response, response_length - 10);
       // padded_respdata_length =
@@ -1557,6 +1567,7 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
                                     sizeof(ivd), ivd, ivde);
     uint8_t *respplain = (uint8_t *)malloc(response_length - 10);
+    if (!respplain) return 0;
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Encrypted Response(pcd < picc)"));
     Adafruit_PN532::PrintHex(response, response_length - 10);
@@ -1852,7 +1863,8 @@ uint8_t Adafruit_PN532::ntag424_MAC(uint8_t *key, uint8_t *cmd,
   PN532DEBUGPRINT.print(F("mesglen2: "));
   Serial.println(msglen);
 #endif
-  uint8_t mesg[msglen];
+  uint8_t mesg[48]; // max MAC input per NTAG424 spec
+  if (msglen > sizeof(mesg)) return;
 
   int dataoffset = 0;
   mesg[dataoffset] = cmd[0];
@@ -1966,9 +1978,13 @@ void Adafruit_PN532::ntag424_derive_session_keys(uint8_t *key, uint8_t *RndA,
 /**************************************************************************/
 
 uint32_t Adafruit_PN532::ntag424_crc32(uint8_t *data, uint8_t datalength) {
+#ifdef NTAG424DEBUG
   Adafruit_PN532::PrintHexChar((uint8_t const *)data, datalength);
+#endif
   uint32_t const crc32_res = crc32.calc((uint8_t const *)data, datalength);
+#ifdef NTAG424DEBUG
   Serial.println(crc32_res, HEX);
+#endif
   return crc32_res;
 }
 
@@ -2192,11 +2208,12 @@ uint8_t Adafruit_PN532::ntag424_Authenticate(uint8_t *key, uint8_t keyno,
   /* Read the response packet */
   readdata(pn532_packetbuffer, 42);
   //#ifdef NTAG424DEBUG
+#ifdef NTAG424DEBUG
   PN532DEBUGPRINT.println(F("> AUTH 2 - PCD encrypted answer: "));
   Adafruit_PN532::PrintHexChar(apdu, apdusize);
   PN532DEBUGPRINT.print(F("Received: "));
   Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 42);
-  //#endif
+#endif
   if (pn532_packetbuffer[7] != 0x00 || pn532_packetbuffer[40] != 0x91 ||
       pn532_packetbuffer[41] != 0x00) {
 #ifdef NTAG424DEBUG
@@ -2398,7 +2415,9 @@ uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
       NTAG424_COMM_MODE_FULL, result, sizeof(result)
 
   );
+#ifdef NTAG424DEBUG
   Adafruit_PN532::PrintHex(result, response_length);
+#endif
 
   if ((result[0] != 0x91) || (result[1] != 0x00)) {
     return false;
@@ -2478,21 +2497,11 @@ uint8_t Adafruit_PN532::ntag424_GetTTStatus(uint8_t *buffer) {
     @return  size of status
 */
 /**************************************************************************/
-// Attention: ReadSig crashes currently. Response exceeds
-// sizeof(pn532_packetbuffer). Maybe multiple reads?
+// ReadSig response exceeds sizeof(pn532_packetbuffer) and needs
+// multi-frame reading (NextFrame). Not yet implemented.
 uint8_t Adafruit_PN532::ntag424_ReadSig(uint8_t *buffer) {
-  uint8_t cla[1] = {NTAG424_COM_CLA};
-  uint8_t ins[1] = {NTAG424_CMD_READSIG};
-  uint8_t p1[1] = {0x0};
-  uint8_t p2[1] = {0x0};
-  uint8_t cmd_header[1] = {0x00};
-  uint8_t cmd_data[1] = {0x00};
-  uint8_t result[58];
-  uint8_t resp_size = Adafruit_PN532::ntag424_apdu_send(
-      cla, ins, p1, p2, cmd_header, 0, cmd_data, 1, 0, NTAG424_COMM_MODE_MAC,
-      result, sizeof(result));
-  memcpy(buffer, result, resp_size);
-  return resp_size;
+  (void)buffer;
+  return 0;
 }
 
 /*!
@@ -2655,13 +2664,12 @@ uint8_t Adafruit_PN532::ntag424_GetVersion() {
     return 0;
   }
   readdata(pn532_packetbuffer, 15);
-  ntag424_VersionInfo.VendorID = pn532_packetbuffer[8];
-  ntag424_VersionInfo.SWType = pn532_packetbuffer[9];
-  ntag424_VersionInfo.SWSubType = pn532_packetbuffer[10];
-  ntag424_VersionInfo.SWMajorVersion = pn532_packetbuffer[11];
-  ntag424_VersionInfo.SWMinorVersion = pn532_packetbuffer[12];
-  ntag424_VersionInfo.SWStorageSize = pn532_packetbuffer[13];
-  ntag424_VersionInfo.SWProtocol = pn532_packetbuffer[14];
+  ntag424_VersionInfo.SWType = pn532_packetbuffer[8];
+  ntag424_VersionInfo.SWSubType = pn532_packetbuffer[9];
+  ntag424_VersionInfo.SWMajorVersion = pn532_packetbuffer[10];
+  ntag424_VersionInfo.SWMinorVersion = pn532_packetbuffer[11];
+  ntag424_VersionInfo.SWStorageSize = pn532_packetbuffer[12];
+  ntag424_VersionInfo.SWProtocol = pn532_packetbuffer[13];
 
   if (!(pn532_packetbuffer[14] == 0xaf)) {
 #ifdef NTAG424DEBUG
@@ -2730,9 +2738,11 @@ bool Adafruit_PN532::ntag424_FormatNDEF() {
   uint8_t offset = 0;
   uint8_t datalen = sizeof(ndefdata);
   for (int i = 0; i < memsize; i += sizeof(ndefdata)) {
+#ifdef NTAG424DEBUG
     Serial.print(i);
     Serial.print(": ");
     Serial.println(offset);
+#endif
     p2[0] = offset;
     if ((offset + datalen) > memsize) {
       datalen = memsize - offset;
@@ -2774,9 +2784,11 @@ bool Adafruit_PN532::ntag424_ISOUpdateBinary(uint8_t *data_to_write,
   uint8_t offset = 0;
   uint8_t datalen = PN532_PACKBUFFSIZ - 10;
   for (int i = 0; i < length; i += datalen) {
+#ifdef NTAG424DEBUG
     Serial.print(i);
     Serial.print(": ");
     Serial.println(offset);
+#endif
     p2[0] = offset;
     if ((offset + datalen) > length) {
       datalen = length - offset;
