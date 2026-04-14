@@ -74,8 +74,6 @@ static void pn532_spi_full_duplex(Adafruit_SPIDevice *dev,
 #include "esp_random.h"
 #endif
 
-Arduino_CRC32 crc32; ///< Arduino CRC32 Class
-
 byte pn532ack[] = {0x00, 0x00, 0xFF,
                    0x00, 0xFF, 0x00}; ///< ACK message from PN532
 byte pn532response_firmwarevers[] = {
@@ -1508,8 +1506,6 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
   // pn532_packetbuffer[3] - 8);
   Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 5 + pn532_packetbuffer[3]);
   //#endif
-  // increase cmd_counter
-  ntag424_Session.cmd_counter += 1;
 
   uint8_t response_length = pn532_packetbuffer[3] - 3;
   memcpy(response, pn532_packetbuffer + 8, response_length);
@@ -1626,6 +1622,8 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     memset(response + resp_no_padding, 0, response_length - resp_no_padding);
     response_length = resp_no_padding;
   }
+  // increase cmd_counter
+  ntag424_Session.cmd_counter += 1;
   return response_length;
 }
 
@@ -1999,6 +1997,7 @@ void Adafruit_PN532::ntag424_derive_session_keys(uint8_t *key, uint8_t *RndA,
 /**************************************************************************/
 
 uint32_t Adafruit_PN532::ntag424_crc32(uint8_t *data, uint8_t datalength) {
+  Arduino_CRC32 crc32;
 #ifdef NTAG424DEBUG
   Adafruit_PN532::PrintHexChar((uint8_t const *)data, datalength);
 #endif
