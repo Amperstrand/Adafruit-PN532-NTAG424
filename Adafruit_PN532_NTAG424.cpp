@@ -2269,6 +2269,7 @@ uint8_t Adafruit_PN532::ntag424_Authenticate(uint8_t *key, uint8_t keyno,
          NTAG424_AUTHRESPONSE_PCDCAP2_SIZE);
   // cleanup session
   ntag424_Session.cmd_counter = 0;
+  ntag424_Session.authenticated = true;
 
   // Return OK signal
 #ifdef NTAG424DEBUG
