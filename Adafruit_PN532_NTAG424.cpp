@@ -1883,7 +1883,7 @@ uint8_t Adafruit_PN532::ntag424_MAC(uint8_t *key, uint8_t *cmd,
   Serial.println(msglen);
 #endif
   uint8_t mesg[48]; // max MAC input per NTAG424 spec
-  if (msglen > sizeof(mesg)) return;
+  if (msglen > sizeof(mesg)) return 0;
 
   int dataoffset = 0;
   mesg[dataoffset] = cmd[0];
