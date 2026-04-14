@@ -70,6 +70,10 @@ static void pn532_spi_full_duplex(Adafruit_SPIDevice *dev,
 }
 #endif
 
+#ifdef ESP32
+#include "esp_random.h"
+#endif
+
 Arduino_CRC32 crc32; ///< Arduino CRC32 Class
 
 byte pn532ack[] = {0x00, 0x00, 0xFF,
@@ -1312,7 +1316,11 @@ uint8_t Adafruit_PN532::mifareultralight_WritePage(uint8_t page,
 /**************************************************************************/
 void Adafruit_PN532::ntag424_random(uint8_t *output, uint8_t bytecount) {
   for (int i = 0; i < bytecount; i++) {
+#ifdef ESP32
+    output[i] = esp_random() & 0xFF;
+#else
     output[i] = random(256);
+#endif
   }
 }
 
