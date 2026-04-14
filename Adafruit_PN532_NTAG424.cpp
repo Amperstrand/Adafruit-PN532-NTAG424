@@ -1572,7 +1572,7 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     PN532DEBUGPRINT.println(F("Response CMAC ok! (picc == pcd)"));
   }
   // decrypt the response in mode.full
-  if ((response_length >= 10) && (comm_mode == NTAG424_COMM_MODE_FULL)) {
+  if ((response_length > 10) && (comm_mode == NTAG424_COMM_MODE_FULL)) {
     uint8_t ivd[16];
     uint8_t ivde[16];
     ivd[0] = 0x5A;
