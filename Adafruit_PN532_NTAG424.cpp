@@ -2406,14 +2406,20 @@ uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
   uint8_t keydata[32];
   uint8_t keydata_length = 21;
   if (keynumber > 0) {
+    uint32_t crc32_xorkey = Adafruit_PN532::ntag424_crc32(xorkey, 16);
+    crc32_xorkey = ~crc32_xorkey;
+    uint8_t crcxorbytes[4];
+    memcpy(crcxorbytes, &crc32_xorkey, sizeof(uint32_t));
     memcpy(keydata, xorkey, 16);
     memcpy(keydata + 16, &keyversion, 1);
     memcpy(keydata + 17, crcbytes, 4);
-    keydata_length = 21;
+    memcpy(keydata + 21, crcxorbytes, 4);
+    keydata_length = 25;
   } else if (keynumber == 0) {
     memcpy(keydata, newkey, 16);
     memcpy(keydata + 16, &keyversion, 1);
-    keydata_length = 17;
+    memcpy(keydata + 17, crcbytes, 4);
+    keydata_length = 21;
   }
 #ifdef NTAG424DEBUG
   Serial.println("keydata:");
