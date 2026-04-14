@@ -2384,8 +2384,10 @@ uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
   for (int i = 0; i < 16; ++i) {
     xorkey[i] = oldkey[i] ^ newkey[i];
   }
+  // CRC-32 without final XOR (JAMCRC per proxmark3 crc32_ex reference)
+  // proxmark3 common/crc32.c: init=0xFFFFFFFF, poly=0xEDB88320, NO final XOR
+  // Arduino_CRC32::calc returns standard CRC-32 (WITH final XOR), so invert to match
   uint32_t crc32_newkey = Adafruit_PN532::ntag424_crc32(newkey, 16);
-  // we need JAMCRCn which is the binary invers
   crc32_newkey = ~crc32_newkey;
 #ifdef NTAG424DEBUG
   Serial.println("old key");
@@ -2394,33 +2396,28 @@ uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
   Adafruit_PN532::PrintHex(newkey, 16);
   Serial.println("XOR key");
   Adafruit_PN532::PrintHex(xorkey, 16);
-  Serial.println("CRC32 key");
+  Serial.printf("CRC32 (JAMCRC): %02X %02X %02X %02X\n",
+                (uint8_t)(crc32_newkey & 0xFF),
+                (uint8_t)((crc32_newkey >> 8) & 0xFF),
+                (uint8_t)((crc32_newkey >> 16) & 0xFF),
+                (uint8_t)((crc32_newkey >> 24) & 0xFF));
 #endif
   uint8_t crcbytes[4];
   memcpy(crcbytes, &crc32_newkey, sizeof(uint32_t));
-#ifdef NTAG424DEBUG
-  Serial.printf("ROM CRC: %02X %02X %02X %02X\n", crcbytes[0], crcbytes[1],
-                crcbytes[2], crcbytes[3]);
-  Serial.println(crc32_newkey, HEX);
-#endif
-  // assemble keydata
+  // assemble keydata per proxmark3 ntag424_change_key (cmdhfntag424.c)
   uint8_t keydata[32];
-  uint8_t keydata_length = 21;
+  uint8_t keydata_length = 0;
   if (keynumber > 0) {
-    uint32_t crc32_xorkey = Adafruit_PN532::ntag424_crc32(xorkey, 16);
-    crc32_xorkey = ~crc32_xorkey;
-    uint8_t crcxorbytes[4];
-    memcpy(crcxorbytes, &crc32_xorkey, sizeof(uint32_t));
+    // Non-master: XOR(old,new)(16) || keyVer(1) || JAMCRC(newKey)(4) = 21 bytes
     memcpy(keydata, xorkey, 16);
     memcpy(keydata + 16, &keyversion, 1);
     memcpy(keydata + 17, crcbytes, 4);
-    memcpy(keydata + 21, crcxorbytes, 4);
-    keydata_length = 25;
-  } else if (keynumber == 0) {
+    keydata_length = 21;
+  } else {
+    // Master key self-change: newKey(16) || keyVer(1) = 17 bytes (no CRC)
     memcpy(keydata, newkey, 16);
     memcpy(keydata + 16, &keyversion, 1);
-    memcpy(keydata + 17, crcbytes, 4);
-    keydata_length = 21;
+    keydata_length = 17;
   }
 #ifdef NTAG424DEBUG
   Serial.println("keydata:");
