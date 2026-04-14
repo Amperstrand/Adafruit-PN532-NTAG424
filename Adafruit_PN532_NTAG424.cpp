@@ -1532,15 +1532,14 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     memcpy(checkmacin + 3, ntag424_authresponse_TI,
            NTAG424_AUTHRESPONSE_TI_SIZE);
     uint8_t padded_respdata_length = 0;
-    uint8_t *respdata = (uint8_t *)malloc(response_length - 10);
-    if (!respdata) { free(checkmacin); return 0; }
     if (response_length > 10) {
+      uint8_t *respdata = (uint8_t *)malloc(response_length - 10);
+      if (!respdata) { free(checkmacin); return 0; }
       memcpy(respdata, response, response_length - 10);
-      // padded_respdata_length =
-      // Adafruit_PN532::ntag424_addpadding(response_length - 10 ,16, respdata);
       padded_respdata_length = response_length - 10;
       memcpy(checkmacin + 3 + NTAG424_AUTHRESPONSE_TI_SIZE, respdata,
              padded_respdata_length);
+      free(respdata);
     }
     maclength = 3 + NTAG424_AUTHRESPONSE_TI_SIZE + padded_respdata_length;
 #ifdef NTAG424DEBUG
@@ -1555,7 +1554,6 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     PN532DEBUGPRINT.print(F("checkcmac:"));
     Adafruit_PN532::PrintHex(checkmac, 8);
 #endif
-    free(respdata);
     free(checkmacin);
     for (int i = 0; i < 8; i++) {
       if (respcmac[i] != checkmac[i]) {
