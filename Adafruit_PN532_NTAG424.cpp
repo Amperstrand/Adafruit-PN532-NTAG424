@@ -1405,21 +1405,20 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
       Serial.println(padded_payload_length);
       Adafruit_PN532::PrintHexChar(payload_padded, padded_payload_length);
 #endif
-      // assemble iv
-      uint8_t iv[32];
+      uint8_t iv[16];
       uint8_t ive[16];
       iv[0] = 0xA5;
       iv[1] = 0x5A;
       memcpy(iv + 2, ntag424_authresponse_TI, 4);
       iv[6] = ntag424_Session.cmd_counter & 0xff;
       iv[7] = (ntag424_Session.cmd_counter >> 8) & 0xff;
-      memset(iv + 7, 0, 24); // was 25
+      memset(iv + 8, 0, 8);
 #ifdef NTAG424DEBUG
       Serial.println("IV-init:");
       Adafruit_PN532::PrintHex(iv, 16);
 #endif
       Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
-                                      sizeof(iv), iv, ive);
+                                      16, iv, ive);
       // encrypt cmd_data using SesAuthENCKey
       // padded_payload_length
       // uint8_t payload_encrypted[32];
@@ -1569,18 +1568,16 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
   }
   // decrypt the response in mode.full
   if ((response_length >= 10) && (comm_mode == NTAG424_COMM_MODE_FULL)) {
-    uint8_t ivd[32];
+    uint8_t ivd[16];
     uint8_t ivde[16];
     ivd[0] = 0x5A;
     ivd[1] = 0xA5;
     memcpy(ivd + 2, ntag424_authresponse_TI, 4);
     ivd[6] = ntag424_Session.cmd_counter & 0xff;
     ivd[7] = (ntag424_Session.cmd_counter >> 8) & 0xff;
-    memset(ivd + 7, 0, 25);
-    // Serial.println("IV-init:");
-    // Adafruit_PN532::PrintHex(iv, 16);
+    memset(ivd + 8, 0, 8);
     Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
-                                    sizeof(ivd), ivd, ivde);
+                                    16, ivd, ivde);
     uint8_t *respplain = (uint8_t *)malloc(response_length - 10);
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Encrypted Response(pcd < picc)"));
