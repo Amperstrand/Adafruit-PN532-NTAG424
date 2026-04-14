@@ -1526,9 +1526,10 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     uint8_t *checkmacin = (uint8_t *)malloc(response_length + 6);
     if (!checkmacin) return 0;
     uint8_t maclength = 0;
+    uint16_t resp_counter = ntag424_Session.cmd_counter + 1;
     checkmacin[0] = response[response_length - 1];
-    checkmacin[1] = ntag424_Session.cmd_counter & 0xff;
-    checkmacin[2] = (ntag424_Session.cmd_counter >> 8) & 0xff;
+    checkmacin[1] = resp_counter & 0xff;
+    checkmacin[2] = (resp_counter >> 8) & 0xff;
     memcpy(checkmacin + 3, ntag424_authresponse_TI,
            NTAG424_AUTHRESPONSE_TI_SIZE);
     uint8_t padded_respdata_length = 0;
@@ -1576,8 +1577,8 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     ivd[0] = 0x5A;
     ivd[1] = 0xA5;
     memcpy(ivd + 2, ntag424_authresponse_TI, 4);
-    ivd[6] = ntag424_Session.cmd_counter & 0xff;
-    ivd[7] = (ntag424_Session.cmd_counter >> 8) & 0xff;
+    ivd[6] = (ntag424_Session.cmd_counter + 1) & 0xff;
+    ivd[7] = ((ntag424_Session.cmd_counter + 1) >> 8) & 0xff;
     memset(ivd + 8, 0, 8);
     Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
                                     16, ivd, ivde);
