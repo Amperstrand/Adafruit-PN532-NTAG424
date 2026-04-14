@@ -2353,13 +2353,13 @@ uint8_t Adafruit_PN532::ntag424_ChangeFileSettings(uint8_t fileno,
     @param   oldkey       Current key (16 byte)
     @param   newkey       New key     (16 byte)
     @param   keynumber    Keynumber to change (0-4)
+    @param   keyversion   Key version byte (default 0x01). Use 0x00 for reset-to-factory.
 
     @return  false=fail|true=success
 */
 /**************************************************************************/
 uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
-                                          uint8_t keynumber) {
-  uint8_t keyversion[1] = {0x01};
+                                          uint8_t keynumber, uint8_t keyversion) {
   uint8_t xorkey[16];
   for (int i = 0; i < 16; ++i) {
     xorkey[i] = oldkey[i] ^ newkey[i];
@@ -2388,12 +2388,12 @@ uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
   uint8_t keydata_length = 21;
   if (keynumber > 0) {
     memcpy(keydata, xorkey, 16);
-    memcpy(keydata + 16, keyversion, 1);
+    memcpy(keydata + 16, &keyversion, 1);
     memcpy(keydata + 17, crcbytes, 4);
     keydata_length = 21;
   } else if (keynumber == 0) {
     memcpy(keydata, newkey, 16);
-    memcpy(keydata + 16, keyversion, 1);
+    memcpy(keydata + 16, &keyversion, 1);
     keydata_length = 17;
   }
 #ifdef NTAG424DEBUG

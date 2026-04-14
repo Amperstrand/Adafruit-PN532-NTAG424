@@ -251,7 +251,7 @@ public:
   uint8_t ntag424_ReadData(uint8_t *buffer, int fileno, int offset, int size);
   uint8_t ntag424_Authenticate(uint8_t *key, uint8_t keyno, uint8_t cmd);
   uint8_t ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
-                            uint8_t keynumber);
+                            uint8_t keynumber, uint8_t keyversion = 0x01);
   uint8_t ntag424_ReadSig(uint8_t *buffer);
   uint8_t ntag424_GetTTStatus(uint8_t *buffer);
   uint8_t ntag424_GetCardUID(uint8_t *buffer);
