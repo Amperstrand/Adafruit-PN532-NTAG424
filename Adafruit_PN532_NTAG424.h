@@ -255,14 +255,18 @@ public:
   uint8_t ntag424_ReadSig(uint8_t *buffer);
   uint8_t ntag424_GetTTStatus(uint8_t *buffer);
   uint8_t ntag424_GetCardUID(uint8_t *buffer);
+  bool ntag424_GetKeyVersion(uint8_t keyno, uint8_t *version);
   uint8_t ntag424_GetFileSettings(uint8_t fileno, uint8_t *buffer,
                                   uint8_t comm_mode);
   uint8_t ntag424_ChangeFileSettings(uint8_t fileno, uint8_t *filesettings,
                                      uint8_t filesettings_length,
                                      uint8_t comm_mode);
+  bool ntag424_ISOSelectNDEFFile();
+  bool ntag424_ISOSelectCCFile();
+  int16_t ntag424_ReadNDEFMessage(uint8_t *buffer, uint16_t maxsize);
   uint8_t ntag424_ISOReadFile(uint8_t *buffer, int maxsize);
   uint8_t ntag424_ISOReadBinary(uint16_t offset, uint8_t le, uint8_t *response,
-                                 uint16_t response_bufsize);
+                                  uint16_t response_bufsize);
   bool ntag424_FormatNDEF();
   bool ntag424_ISOUpdateBinary(uint8_t *buffer, uint8_t length);
   bool ntag424_ISOSelectFileById(int fileid);

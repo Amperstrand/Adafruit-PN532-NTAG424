@@ -128,6 +128,12 @@ static bool ntag424_iso_select_file(Adafruit_PN532 *nfc, uint8_t p1_value,
   return ntag424_plain_command_succeeded(result, response_length);
 }
 
+static bool ntag424_plain_status_ok(const uint8_t *response,
+                                    uint8_t response_length,
+                                    uint8_t sw1, uint8_t sw2) {
+  return ntag424_response_has_status(response, response_length, sw1, sw2);
+}
+
 /**************************************************************************/
 /*!
     @brief  Instantiates a new PN532 class using software SPI.
@@ -2486,6 +2492,31 @@ uint8_t Adafruit_PN532::ntag424_GetCardUID(uint8_t *buffer) {
                                            buffer, 34);
 }
 
+bool Adafruit_PN532::ntag424_GetKeyVersion(uint8_t keyno, uint8_t *version) {
+  if (version == nullptr) {
+    return false;
+  }
+
+  uint8_t cla[] = {NTAG424_COM_CLA};
+  uint8_t ins[] = {0x64};
+  uint8_t p1[] = {0x00};
+  uint8_t p2[] = {0x00};
+  uint8_t cmd_header[] = {keyno};
+  uint8_t result[16] = {0};
+
+  const uint8_t response_length = ntag424_apdu_send(
+      cla, ins, p1, p2, cmd_header, sizeof(cmd_header), nullptr, 0, 0,
+      NTAG424_COMM_MODE_PLAIN, result, sizeof(result));
+
+  if (response_length < 3 ||
+      !ntag424_plain_status_ok(result, response_length, 0x91, 0x00)) {
+    return false;
+  }
+
+  *version = result[0];
+  return true;
+}
+
 /*!
     @brief   Send GetTTStatus request to picc. (TagTamper status) Authentication
    required
@@ -2751,21 +2782,11 @@ uint8_t Adafruit_PN532::ntag424_GetVersion() {
   }
 
   memcpy(&ntag424_VersionInfo.UID, pn532_packetbuffer + 8, 7);
-  uint8_t BatchNo[5] = {pn532_packetbuffer[15], pn532_packetbuffer[16],
-                        pn532_packetbuffer[17], pn532_packetbuffer[18],
-                        (byte)(pn532_packetbuffer[19] & 0xf0)};
-  memcpy(&ntag424_VersionInfo.BatchNo, BatchNo, 5);
-  uint8_t FabKey[5] = {(byte)(pn532_packetbuffer[19] & 0x0f),
-                       pn532_packetbuffer[20],
-                       (byte)(pn532_packetbuffer[21] & 0x80)};
-  memcpy(&ntag424_VersionInfo.FabKey, FabKey, 5);
-  ntag424_VersionInfo.CWProd = (byte)(pn532_packetbuffer[21] & 0x3f);
-  ntag424_VersionInfo.YearProd = pn532_packetbuffer[22];
-  if (pn532_packetbuffer[23] != 0x91) {
-    ntag424_VersionInfo.FabKeyID = pn532_packetbuffer[23];
-  } else {
-    ntag424_VersionInfo.FabKeyID = 0;
-  }
+  memcpy(&ntag424_VersionInfo.BatchNo, pn532_packetbuffer + 15, 5);
+  memset(&ntag424_VersionInfo.FabKey, 0, sizeof(ntag424_VersionInfo.FabKey));
+  ntag424_VersionInfo.CWProd = pn532_packetbuffer[20];
+  ntag424_VersionInfo.YearProd = pn532_packetbuffer[21];
+  ntag424_VersionInfo.FabKeyID = 0;
 
 #ifdef NTAG424DEBUG
   PN532DEBUGPRINT.println(F("GetVersion: all 3 frames OK"));
@@ -2897,6 +2918,72 @@ bool Adafruit_PN532::ntag424_ISOSelectFileById(int fileid) {
 /**************************************************************************/
 bool Adafruit_PN532::ntag424_ISOSelectFileByDFN(uint8_t *dfn) {
   return ntag424_iso_select_file(this, 0x4, dfn, 7);
+}
+
+bool Adafruit_PN532::ntag424_ISOSelectCCFile() {
+  const uint8_t cmd_data[2] = {0xE1, 0x03};
+  return ntag424_iso_select_file(this, 0x0, (uint8_t *)cmd_data,
+                                 sizeof(cmd_data));
+}
+
+bool Adafruit_PN532::ntag424_ISOSelectNDEFFile() {
+  const uint8_t dfn[7] = {0xD2, 0x76, 0x00, 0x00, 0x85, 0x01, 0x01};
+  const uint8_t ndef_file[2] = {0xE1, 0x04};
+
+  return ntag424_iso_select_file(this, 0x4, (uint8_t *)dfn, sizeof(dfn)) &&
+         ntag424_iso_select_file(this, 0x0, (uint8_t *)ndef_file,
+                                 sizeof(ndef_file));
+}
+
+int16_t Adafruit_PN532::ntag424_ReadNDEFMessage(uint8_t *buffer,
+                                                uint16_t maxsize) {
+  if (buffer == nullptr || maxsize == 0) {
+    return -1;
+  }
+
+  if (!ntag424_ISOSelectNDEFFile()) {
+    return -1;
+  }
+
+  uint8_t nlen_response[8] = {0};
+  const uint8_t nlen_resp_len = ntag424_ISOReadBinary(0, 2, nlen_response,
+                                                      sizeof(nlen_response));
+  if (nlen_resp_len < 4 ||
+      !ntag424_plain_status_ok(nlen_response, nlen_resp_len, 0x90, 0x00)) {
+    return -1;
+  }
+
+  const uint16_t nlen = ((uint16_t)nlen_response[0] << 8) | nlen_response[1];
+  if (nlen == 0) {
+    return 0;
+  }
+
+  uint16_t total_to_read = nlen;
+  if (total_to_read > maxsize) {
+    total_to_read = maxsize;
+  }
+
+  uint16_t total_read = 0;
+  while (total_read < total_to_read) {
+    uint8_t chunk = total_to_read - total_read;
+    if (chunk > 48) {
+      chunk = 48;
+    }
+
+    uint8_t page_response[56] = {0};
+    const uint8_t page_resp_len = ntag424_ISOReadBinary(
+        2 + total_read, chunk, page_response, sizeof(page_response));
+    if (page_resp_len < 3 ||
+        !ntag424_plain_status_ok(page_response, page_resp_len, 0x90, 0x00)) {
+      return -1;
+    }
+
+    const uint8_t data_len = page_resp_len - 2;
+    memcpy(buffer + total_read, page_response, data_len);
+    total_read += data_len;
+  }
+
+  return total_read;
 }
 
 /*!
