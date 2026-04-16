@@ -424,12 +424,13 @@ bool ntag424_ISOUpdateBinary(NTAG424_Reader *reader, uint8_t *data_to_write,
           NTAG424_CMD_ISOUPDATEBINARY, 0x84, offset, cmd_header, 0,
           data_to_write + offset, datalen, 0, NTAG424_COMM_MODE_PLAIN, result,
           sizeof(result));
-      if (bytesread < 4) {
+      if (!ntag424_plain_command_succeeded(result, bytesread)) {
+        return false;
       }
     }
     offset += datalen;
   }
-  return ntag424_plain_command_succeeded(result, sizeof(result));
+  return true;
 }
 
 bool ntag424_ISOSelectFileById(NTAG424_Reader *reader,
