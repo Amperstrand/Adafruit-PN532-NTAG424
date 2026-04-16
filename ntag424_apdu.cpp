@@ -64,14 +64,13 @@ uint8_t ntag424_build_apdu(uint8_t cla, uint8_t ins, uint8_t p1, uint8_t p2,
                            const uint8_t *cmd_header, uint8_t cmd_header_len,
                            const uint8_t *cmd_data, uint8_t cmd_data_len,
                            uint8_t le, uint8_t comm_mode,
-                           ntag424_SessionType *session, const uint8_t *TI,
-                           uint8_t *apdu_out) {
+                           ntag424_SessionType *session, uint8_t *apdu_out) {
   if (apdu_out == nullptr) {
     return 0;
   }
 
   if ((comm_mode == kNtag424Mac || comm_mode == kNtag424Full) &&
-      (session == nullptr || TI == nullptr || !session->authenticated)) {
+      (session == nullptr || !session->authenticated)) {
     return 0;
   }
 
@@ -125,7 +124,7 @@ uint8_t ntag424_build_apdu(uint8_t cla, uint8_t ins, uint8_t p1, uint8_t p2,
       uint8_t ive[16];
       iv[0] = 0xA5;
       iv[1] = 0x5A;
-      memcpy(iv + 2, TI, NTAG424_AUTHRESPONSE_TI_SIZE);
+      memcpy(iv + 2, session->TI, NTAG424_AUTHRESPONSE_TI_SIZE);
       iv[6] = session->cmd_counter & 0xff;
       iv[7] = (session->cmd_counter >> 8) & 0xff;
       memset(iv + 8, 0, 8);
@@ -179,13 +178,13 @@ uint8_t ntag424_build_apdu(uint8_t cla, uint8_t ins, uint8_t p1, uint8_t p2,
 uint8_t ntag424_process_response(const uint8_t *response,
                                  uint8_t response_length, uint8_t comm_mode,
                                  ntag424_SessionType *session,
-                                 const uint8_t *TI, uint8_t *processed_out) {
+                                 uint8_t *processed_out) {
   if (response == nullptr || processed_out == nullptr) {
     return 0;
   }
 
   if ((comm_mode == kNtag424Mac || comm_mode == kNtag424Full) &&
-      (session == nullptr || TI == nullptr)) {
+      session == nullptr) {
     return 0;
   }
 
@@ -203,7 +202,7 @@ uint8_t ntag424_process_response(const uint8_t *response,
     checkmacin[0] = response[response_length - 1];
     checkmacin[1] = resp_counter & 0xff;
     checkmacin[2] = (resp_counter >> 8) & 0xff;
-    memcpy(checkmacin + 3, TI, NTAG424_AUTHRESPONSE_TI_SIZE);
+    memcpy(checkmacin + 3, session->TI, NTAG424_AUTHRESPONSE_TI_SIZE);
 
     uint8_t padded_respdata_length = 0;
     if (response_length > 10) {
@@ -230,7 +229,7 @@ uint8_t ntag424_process_response(const uint8_t *response,
     uint8_t ivde[16];
     ivd[0] = 0x5A;
     ivd[1] = 0xA5;
-    memcpy(ivd + 2, TI, NTAG424_AUTHRESPONSE_TI_SIZE);
+    memcpy(ivd + 2, session->TI, NTAG424_AUTHRESPONSE_TI_SIZE);
     ivd[6] = (session->cmd_counter + 1) & 0xff;
     ivd[7] = ((session->cmd_counter + 1) >> 8) & 0xff;
     memset(ivd + 8, 0, 8);
@@ -272,8 +271,7 @@ uint8_t ntag424_process_response(const uint8_t *response,
 uint8_t ntag424_read_simple_full_response(NTAG424_Reader *reader,
                                           uint8_t command,
                                           ntag424_SessionType *session,
-                                          const uint8_t *TI, uint8_t *buffer,
-                                          uint8_t result_size) {
+                                          uint8_t *buffer, uint8_t result_size) {
   (void)result_size;
   if (reader == nullptr) {
     return 0;
@@ -282,7 +280,7 @@ uint8_t ntag424_read_simple_full_response(NTAG424_Reader *reader,
   uint8_t apdu[kNtag424MaxApduSize];
   const uint8_t apdu_length =
       ntag424_build_apdu(kNtag424ComCla, command, 0x00, 0x00, nullptr, 0,
-                         nullptr, 0, 0, kNtag424Full, session, TI, apdu);
+                         nullptr, 0, 0, kNtag424Full, session, apdu);
   if (apdu_length == 0) {
     return 0;
   }
@@ -296,15 +294,14 @@ uint8_t ntag424_read_simple_full_response(NTAG424_Reader *reader,
 
   uint8_t processed[34];
   const uint8_t processed_length = ntag424_process_response(
-      response, response_length, kNtag424Full, session, TI, processed);
+      response, response_length, kNtag424Full, session, processed);
   return ntag424_copy_response_data_if_status(processed, processed_length, 0x91,
                                               0x00, buffer);
 }
 
 bool ntag424_iso_select_file(NTAG424_Reader *reader, uint8_t p1_value,
                              uint8_t *cmd_data, uint8_t cmd_data_length,
-                             ntag424_SessionType *session,
-                             const uint8_t *TI) {
+                             ntag424_SessionType *session) {
   if (reader == nullptr) {
     return false;
   }
@@ -313,7 +310,7 @@ bool ntag424_iso_select_file(NTAG424_Reader *reader, uint8_t p1_value,
   const uint8_t apdu_length =
       ntag424_build_apdu(kNtag424ComIsoCla, kNtag424CmdIsoSelectFile,
                          p1_value, 0x00, nullptr, 0, cmd_data,
-                         cmd_data_length, 0, kNtag424Plain, session, TI, apdu);
+                         cmd_data_length, 0, kNtag424Plain, session, apdu);
   if (apdu_length == 0) {
     return false;
   }
@@ -327,7 +324,7 @@ bool ntag424_iso_select_file(NTAG424_Reader *reader, uint8_t p1_value,
 
   uint8_t processed[12];
   const uint8_t processed_length = ntag424_process_response(
-      result, response_length, kNtag424Plain, session, TI, processed);
+      result, response_length, kNtag424Plain, session, processed);
   return ntag424_plain_command_succeeded(processed, processed_length);
 }
 

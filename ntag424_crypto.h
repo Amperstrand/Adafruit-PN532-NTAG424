@@ -14,12 +14,14 @@
 struct ntag424_SessionType {
   bool authenticated;  ///< true = authenticated
   int16_t cmd_counter; ///< command counter
+  uint8_t TI[NTAG424_AUTHRESPONSE_TI_SIZE] = {0};
+  uint8_t RndA[16] = {0};
+  uint8_t PDCAP2[6] = {0};
+  uint8_t PCDCAP2[6] = {0};
   uint8_t
       session_key_enc[NTAG424_SESSION_KEYSIZE]; ///< session encryption key
   uint8_t session_key_mac[NTAG424_SESSION_KEYSIZE]; ///< session mac key
 }; ///< struct type foir the authentication session data
-
-extern uint8_t ntag424_authresponse_TI[NTAG424_AUTHRESPONSE_TI_SIZE];
 
 uint32_t ntag424_crc32(uint8_t *data, uint8_t datalength);
 uint8_t ntag424_addpadding(uint8_t inputlength, uint8_t paddinglength,

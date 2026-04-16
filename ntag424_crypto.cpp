@@ -4,6 +4,28 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef PN532DEBUGPRINT
+#if __has_include("Arduino.h")
+#define PN532DEBUGPRINT Serial
+#else
+#include <cstdio>
+struct DebugPrintStub {
+  void print(const char *s) { std::fputs(s, stdout); }
+  void print(unsigned int v, int) { std::fprintf(stdout, "%02X", v); }
+  void println() { std::fputc('\n', stdout); }
+};
+static DebugPrintStub PN532DEBUGPRINT;
+#endif
+#endif
+static void PrintHexChar(const uint8_t *data, uint32_t len) {
+  for (uint32_t i = 0; i < len; i++) {
+    if (data[i] < 0x10) PN532DEBUGPRINT.print("0");
+    PN532DEBUGPRINT.print(data[i], 16);
+    PN532DEBUGPRINT.print(" ");
+  }
+  PN532DEBUGPRINT.println();
+}
+
 #if __has_include("Arduino.h")
 #include "aescmac.h"
 #else
@@ -14,7 +36,8 @@ long random(long max);
 
 #if defined(ARDUINO) && __has_include(<Arduino_CRC32.h>)
 #include <Arduino_CRC32.h>
-#else
+#elif !defined(ARDUINO_CRC32_H)
+#define ARDUINO_CRC32_H
 class Arduino_CRC32 {
 public:
   uint32_t calc(const uint8_t *data, size_t datalength) {
@@ -146,6 +169,11 @@ uint8_t ntag424_MAC(ntag424_SessionType *session, uint8_t *key, uint8_t *cmd,
                     uint8_t *cmdheader, uint8_t cmdheader_length,
                     uint8_t *cmddata, uint8_t cmddata_length,
                     uint8_t *signature) {
+  if (session == nullptr || key == nullptr || cmd == nullptr ||
+      signature == nullptr) {
+    return 0;
+  }
+
   int16_t intcounter = session->cmd_counter;
 #ifdef NTAG424DEBUG
   PN532DEBUGPRINT.print(F("cmdheader_length: "));
@@ -179,8 +207,7 @@ uint8_t ntag424_MAC(ntag424_SessionType *session, uint8_t *key, uint8_t *cmd,
   dataoffset++;
   memcpy(mesg + dataoffset, ntcounter, sizeof(ntcounter));
   dataoffset += sizeof(ntcounter);
-  memcpy(mesg + dataoffset, ntag424_authresponse_TI,
-         NTAG424_AUTHRESPONSE_TI_SIZE);
+  memcpy(mesg + dataoffset, session->TI, NTAG424_AUTHRESPONSE_TI_SIZE);
   dataoffset += NTAG424_AUTHRESPONSE_TI_SIZE;
   memcpy(mesg + dataoffset, cmdheader, cmdheader_length);
   if (cmddata_length > 0) {

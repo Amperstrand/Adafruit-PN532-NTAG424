@@ -9,7 +9,7 @@ constexpr uint8_t kIsoApplicationDfn[7] = {0xD2, 0x76, 0x00, 0x00,
                                            0x85, 0x01, 0x01};
 
 uint8_t ntag424_send_apdu(NTAG424_Reader *reader, ntag424_SessionType *session,
-                          const uint8_t *TI, uint8_t cla, uint8_t ins,
+                          uint8_t cla, uint8_t ins,
                           uint8_t p1, uint8_t p2, const uint8_t *cmd_header,
                           uint8_t cmd_header_length, const uint8_t *cmd_data,
                           uint8_t cmd_data_length, uint8_t le,
@@ -22,7 +22,7 @@ uint8_t ntag424_send_apdu(NTAG424_Reader *reader, ntag424_SessionType *session,
   uint8_t apdu[kNtag424MaxApduSize] = {0};
   const uint8_t apdu_length =
       ntag424_build_apdu(cla, ins, p1, p2, cmd_header, cmd_header_length,
-                         cmd_data, cmd_data_length, le, comm_mode, session, TI,
+                         cmd_data, cmd_data_length, le, comm_mode, session,
                          apdu);
   if (apdu_length == 0) {
     return 0;
@@ -37,7 +37,7 @@ uint8_t ntag424_send_apdu(NTAG424_Reader *reader, ntag424_SessionType *session,
 
   uint8_t decoded[kNtag424MaxApduSize] = {0};
   const uint8_t decoded_length =
-      ntag424_process_response(response, response_length, comm_mode, session, TI,
+      ntag424_process_response(response, response_length, comm_mode, session,
                                decoded);
   if (decoded_length == 0 || decoded_length > processed_size) {
     return 0;
@@ -81,9 +81,9 @@ uint8_t ntag424_response_data_length(uint8_t response_length) {
 }
 
 uint8_t ntag424_Authenticate(NTAG424_Reader *reader,
-                             ntag424_SessionType *session, uint8_t *TI,
-                             uint8_t *key, uint8_t keyno, uint8_t cmd) {
-  if (reader == nullptr || session == nullptr || TI == nullptr || key == nullptr) {
+                             ntag424_SessionType *session, uint8_t *key,
+                             uint8_t keyno, uint8_t cmd) {
+  if (reader == nullptr || session == nullptr || key == nullptr) {
     return 0;
   }
 
@@ -156,8 +156,14 @@ uint8_t ntag424_Authenticate(NTAG424_Reader *reader,
     return 0;
   }
 
-  memcpy(TI, auth2_response + NTAG424_AUTHRESPONSE_TI_OFFSET,
+  memcpy(session->TI, auth2_response + NTAG424_AUTHRESPONSE_TI_OFFSET,
          NTAG424_AUTHRESPONSE_TI_SIZE);
+  memcpy(session->RndA, RndA, sizeof(session->RndA));
+  memcpy(session->PDCAP2, auth2_response + NTAG424_AUTHRESPONSE_PDCAP2_OFFSET,
+         sizeof(session->PDCAP2));
+  memcpy(session->PCDCAP2,
+         auth2_response + NTAG424_AUTHRESPONSE_PCDCAP2_OFFSET,
+         sizeof(session->PCDCAP2));
   session->cmd_counter = 0;
   session->authenticated = true;
   ntag424_derive_session_keys(session, key, RndA, RndB);
@@ -166,12 +172,12 @@ uint8_t ntag424_Authenticate(NTAG424_Reader *reader,
 
 uint8_t ntag424_GetFileSettings(NTAG424_Reader *reader,
                                 ntag424_SessionType *session,
-                                const uint8_t *TI, uint8_t fileno,
-                                uint8_t *buffer, uint8_t comm_mode) {
+                                uint8_t fileno, uint8_t *buffer,
+                                uint8_t comm_mode) {
   uint8_t result[64] = {0};
   const uint8_t cmd_header[1] = {fileno};
   const uint8_t result_length =
-      ntag424_send_apdu(reader, session, TI, NTAG424_COM_CLA,
+      ntag424_send_apdu(reader, session, NTAG424_COM_CLA,
                         NTAG424_CMD_GETFILESETTINGS, 0x00, 0x00, cmd_header,
                         sizeof(cmd_header), nullptr, 0, 0, comm_mode, result,
                         sizeof(result));
@@ -183,13 +189,12 @@ uint8_t ntag424_GetFileSettings(NTAG424_Reader *reader,
 
 uint8_t ntag424_ChangeFileSettings(NTAG424_Reader *reader,
                                    ntag424_SessionType *session,
-                                   const uint8_t *TI, uint8_t fileno,
-                                   uint8_t *filesettings,
+                                   uint8_t fileno, uint8_t *filesettings,
                                    uint8_t filesettings_length,
                                    uint8_t comm_mode) {
   uint8_t result[30] = {0};
   const uint8_t cmd_header[1] = {fileno};
-  return ntag424_send_apdu(reader, session, TI, NTAG424_COM_CLA,
+  return ntag424_send_apdu(reader, session, NTAG424_COM_CLA,
                            NTAG424_CMD_CHANGEFILESETTINGS, 0x00, 0x00,
                            cmd_header, sizeof(cmd_header), filesettings,
                            filesettings_length, 0, comm_mode, result,
@@ -197,8 +202,7 @@ uint8_t ntag424_ChangeFileSettings(NTAG424_Reader *reader,
 }
 
 uint8_t ntag424_ChangeKey(NTAG424_Reader *reader, ntag424_SessionType *session,
-                          const uint8_t *TI, uint8_t *oldkey,
-                          uint8_t *newkey, uint8_t keynumber,
+                          uint8_t *oldkey, uint8_t *newkey, uint8_t keynumber,
                           uint8_t keyversion) {
   if (oldkey == nullptr || newkey == nullptr) {
     return false;
@@ -212,7 +216,7 @@ uint8_t ntag424_ChangeKey(NTAG424_Reader *reader, ntag424_SessionType *session,
   const uint8_t cmd_header[1] = {keynumber};
   uint8_t result[50] = {0};
   const uint8_t response_length =
-      ntag424_send_apdu(reader, session, TI, NTAG424_COM_CLA,
+      ntag424_send_apdu(reader, session, NTAG424_COM_CLA,
                         NTAG424_COM_CHANGEKEY, 0x00, 0x00, cmd_header,
                         sizeof(cmd_header), keydata, keydata_length, 0,
                         NTAG424_COMM_MODE_FULL, result, sizeof(result));
@@ -220,15 +224,13 @@ uint8_t ntag424_ChangeKey(NTAG424_Reader *reader, ntag424_SessionType *session,
 }
 
 uint8_t ntag424_GetCardUID(NTAG424_Reader *reader,
-                           ntag424_SessionType *session, const uint8_t *TI,
-                           uint8_t *buffer) {
+                           ntag424_SessionType *session, uint8_t *buffer) {
   return ntag424_read_simple_full_response(reader, NTAG424_CMD_GETCARDUUID,
-                                           session, TI, buffer, 34);
+                                           session, buffer, 34);
 }
 
 bool ntag424_GetKeyVersion(NTAG424_Reader *reader, ntag424_SessionType *session,
-                           const uint8_t *TI, uint8_t keyno,
-                           uint8_t *version) {
+                           uint8_t keyno, uint8_t *version) {
   if (version == nullptr) {
     return false;
   }
@@ -236,7 +238,7 @@ bool ntag424_GetKeyVersion(NTAG424_Reader *reader, ntag424_SessionType *session,
   uint8_t result[16] = {0};
   const uint8_t cmd_header[1] = {keyno};
   const uint8_t response_length =
-      ntag424_send_apdu(reader, session, TI, NTAG424_COM_CLA, 0x64, 0x00, 0x00,
+      ntag424_send_apdu(reader, session, NTAG424_COM_CLA, 0x64, 0x00, 0x00,
                         cmd_header, sizeof(cmd_header), nullptr, 0, 0,
                         NTAG424_COMM_MODE_PLAIN, result, sizeof(result));
   if (response_length < 3 || !ntag424_plain_status_ok(result, response_length,
@@ -249,17 +251,15 @@ bool ntag424_GetKeyVersion(NTAG424_Reader *reader, ntag424_SessionType *session,
 }
 
 uint8_t ntag424_GetTTStatus(NTAG424_Reader *reader,
-                            ntag424_SessionType *session, const uint8_t *TI,
-                            uint8_t *buffer) {
+                            ntag424_SessionType *session, uint8_t *buffer) {
   return ntag424_read_simple_full_response(reader, NTAG424_CMD_GETTTSTATUS,
-                                           session, TI, buffer, 32);
+                                           session, buffer, 32);
 }
 
 uint8_t ntag424_ReadSig(NTAG424_Reader *reader, ntag424_SessionType *session,
-                        const uint8_t *TI, uint8_t *buffer) {
+                        uint8_t *buffer) {
   (void)reader;
   (void)session;
-  (void)TI;
   (void)buffer;
   return 0;
 }
@@ -392,7 +392,7 @@ bool ntag424_FormatNDEF(NTAG424_Reader *reader) {
     }
 
     const uint8_t bytesread =
-        ntag424_send_apdu(reader, nullptr, nullptr, NTAG424_COM_ISOCLA,
+        ntag424_send_apdu(reader, nullptr, NTAG424_COM_ISOCLA,
                           NTAG424_CMD_ISOUPDATEBINARY, 0x84, offset, cmd_header,
                           0, ndefdata, datalen, 0, NTAG424_COMM_MODE_PLAIN,
                           result, sizeof(result));
@@ -420,7 +420,7 @@ bool ntag424_ISOUpdateBinary(NTAG424_Reader *reader, uint8_t *data_to_write,
     }
     if (datalen > 0) {
       const uint8_t bytesread = ntag424_send_apdu(
-          reader, nullptr, nullptr, NTAG424_COM_ISOCLA,
+          reader, nullptr, NTAG424_COM_ISOCLA,
           NTAG424_CMD_ISOUPDATEBINARY, 0x84, offset, cmd_header, 0,
           data_to_write + offset, datalen, 0, NTAG424_COMM_MODE_PLAIN, result,
           sizeof(result));
@@ -434,36 +434,33 @@ bool ntag424_ISOUpdateBinary(NTAG424_Reader *reader, uint8_t *data_to_write,
 }
 
 bool ntag424_ISOSelectFileById(NTAG424_Reader *reader,
-                               ntag424_SessionType *session, const uint8_t *TI,
-                               int fileid) {
+                               ntag424_SessionType *session, int fileid) {
   uint8_t cmd_data[2] = {static_cast<uint8_t>((fileid >> 8) & 0xFF),
                          static_cast<uint8_t>(fileid & 0xFF)};
   return ntag424_iso_select_file(reader, 0x00, cmd_data, sizeof(cmd_data),
-                                 session, TI);
+                                 session);
 }
 
 bool ntag424_ISOSelectFileByDFN(NTAG424_Reader *reader,
-                                ntag424_SessionType *session,
-                                const uint8_t *TI, uint8_t *dfn) {
-  return ntag424_iso_select_file(reader, 0x04, dfn, 7, session, TI);
+                                ntag424_SessionType *session, uint8_t *dfn) {
+  return ntag424_iso_select_file(reader, 0x04, dfn, 7, session);
 }
 
 bool ntag424_ISOSelectCCFile(NTAG424_Reader *reader,
-                             ntag424_SessionType *session, const uint8_t *TI) {
+                             ntag424_SessionType *session) {
   uint8_t cmd_data[2] = {0xE1, 0x03};
   return ntag424_iso_select_file(reader, 0x00, cmd_data, sizeof(cmd_data),
-                                 session, TI);
+                                 session);
 }
 
 bool ntag424_ISOSelectNDEFFile(NTAG424_Reader *reader,
-                               ntag424_SessionType *session,
-                               const uint8_t *TI) {
+                               ntag424_SessionType *session) {
   uint8_t dfn[sizeof(kIsoApplicationDfn)] = {0};
   memcpy(dfn, kIsoApplicationDfn, sizeof(dfn));
   uint8_t ndef_file[2] = {0xE1, 0x04};
-  return ntag424_iso_select_file(reader, 0x04, dfn, sizeof(dfn), session, TI) &&
+  return ntag424_iso_select_file(reader, 0x04, dfn, sizeof(dfn), session) &&
          ntag424_iso_select_file(reader, 0x00, ndef_file, sizeof(ndef_file),
-                                 session, TI);
+                                 session);
 }
 
 int16_t ntag424_ReadNDEFMessage(NTAG424_Reader *reader, uint8_t *buffer,
@@ -472,7 +469,7 @@ int16_t ntag424_ReadNDEFMessage(NTAG424_Reader *reader, uint8_t *buffer,
     return -1;
   }
 
-  if (!ntag424_ISOSelectNDEFFile(reader, nullptr, nullptr)) {
+  if (!ntag424_ISOSelectNDEFFile(reader, nullptr)) {
     return -1;
   }
 
