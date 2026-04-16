@@ -13,14 +13,41 @@
 #ifndef ADAFRUIT_PN532_H
 #define ADAFRUIT_PN532_H
 
+#if __has_include("Arduino.h")
 #include "Arduino.h"
+#else
+#include <stdint.h>
+#endif
 
+#if defined(ARDUINO) || __has_include("Arduino.h")
 #include "aescmac.h"
 #include "mbedtls/aes.h"
-#include <Adafruit_I2CDevice.h>
-#include <Adafruit_SPIDevice.h>
-
 #include <Arduino_CRC32.h>
+#endif
+
+#if __has_include(<Adafruit_I2CDevice.h>)
+#include <Adafruit_I2CDevice.h>
+#else
+class Adafruit_I2CDevice;
+#endif
+
+#if __has_include(<Adafruit_SPIDevice.h>)
+#include <Adafruit_SPIDevice.h>
+#else
+class Adafruit_SPIDevice;
+#endif
+
+#if !defined(ARDUINO)
+typedef uint8_t byte;
+class SPIClass {};
+class TwoWire {};
+class HardwareSerial {};
+extern SPIClass SPI;
+extern TwoWire Wire;
+#endif
+#include <string.h>
+
+class PN532_NTAG424_Adapter;
 
 #define PN532_PREAMBLE (0x00)   ///< Command sequence start, byte 1/3
 #define PN532_STARTCODE1 (0x00) ///< Command sequence start, byte 2/3
@@ -186,6 +213,11 @@ public:
   bool writeGPIO(uint8_t pinstate);
   uint8_t readGPIO(void);
   bool setPassiveActivationRetries(uint8_t maxRetries);
+  void getUID(uint8_t *uid, uint8_t *uidLen) {
+    memcpy(uid, _uid, _uidLen);
+    *uidLen = _uidLen;
+  }
+  bool isTagPresent() { return _inListedTag > 0; }
 
   // ISO14443A functions
   bool readPassiveTargetID(
@@ -366,7 +398,8 @@ public:
   static void PrintHex(const byte *data, const uint32_t numBytes);
   static void PrintHexChar(const byte *pbtData, const uint32_t numBytes);
 
-private:
+ private:
+  friend class PN532_NTAG424_Adapter;
   int8_t _irq = -1, _reset = -1, _cs = -1;
   int8_t _uid[7];      // ISO14443A uid
   int8_t _uidLen;      // uid len
