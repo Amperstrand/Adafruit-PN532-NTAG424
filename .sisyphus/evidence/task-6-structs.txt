@@ -1,0 +1,5 @@
+#define NTAG424_COMM_MODE_PLAIN (0x00)
+#define NTAG424_COM_CLA (0x90)
+#define NTAG424_CMD_GETVERSION (0x60)
+struct ntag424_VersionInfoType {
+struct ntag424_FileSettings {

@@ -35,3 +35,16 @@
 - `ntag424_build_apdu()` must reproduce monolith bytes exactly while shifting the payload start from index 2 to index 0 because PN532 transport framing is excluded from the new module.
 - `ntag424_process_response()` keeps CMAC verification and FULL-mode decryption together and increments `session->cmd_counter` only after processing succeeds, matching the monolith behavior.
 - Reader-facing helpers now depend on `NTAG424_Reader::transceive()` plus explicit `session` and `TI` inputs; they no longer depend on `Adafruit_PN532`, PN532 framing, or packetbuffer globals.
+
+## [2026-04-16] Task 6 core extraction notes
+
+- `ntag424_core.h` mirrors the monolith NTAG424 constants plus `ntag424_VersionInfoType` and `ntag424_FileSettings`, but keeps transport dependencies limited to `NTAG424_Reader`, `ntag424_apdu`, and `ntag424_crypto`.
+- The five tightly coupled protocol paths (`Authenticate`, `GetVersion`, `ReadData`, `ISOReadFile`, `ISOReadBinary`) now build raw APDU bytes and call `reader->transceive()` directly, leaving PN532 `InDataExchange` framing to adapters.
+- Commit scope for Task 6 should stay limited to the new core files, task evidence, and notepad update because the repository already contains unrelated modified/untracked files.
+
+## [2026-04-16] Task 7 adapter notes
+
+- Added `PN532_NTAG424_Adapter` as a minimal `NTAG424_Reader` implementation with only `transceive()`, `get_uid()`, and `is_tag_present()`.
+- Adapter header forward-declares `Adafruit_PN532`; only the `.cpp` pulls in `Adafruit_PN532_NTAG424.h` to avoid circular includes.
+- `transceive()` mirrors the monolith InDataExchange framing and response extraction exactly, but uses local `pn532_frame` and `resp_buf` arrays instead of the global packet buffer.
+- Added public `getUID()` and `isTagPresent()` accessors on `Adafruit_PN532` so the adapter can expose UID/presence without taking ownership of reader state.
