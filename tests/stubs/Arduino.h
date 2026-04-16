@@ -14,15 +14,27 @@
 class SerialStub {
 public:
   void begin(unsigned long) {}
+  void println() {}
   void println(int, int = 10) {}
   void println(const char *) {}
+  void println(unsigned int, int = 10) {}
+  void println(long, int = 10) {}
+  void println(unsigned long, int = 10) {}
+  void println(char) {}
   void print(const char *) {}
   void print(int, int = 10) {}
+  void print(unsigned int, int = 10) {}
+  void print(long, int = 10) {}
+  void print(unsigned long, int = 10) {}
+  void print(char) {}
 };
 
-extern SerialStub Serial;
+inline SerialStub Serial;
 
 inline void delay(unsigned long) {}
+inline void pinMode(uint8_t, uint8_t) {}
+inline void digitalWrite(uint8_t, uint8_t) {}
+inline int digitalRead(uint8_t) { return 0; }
 
 inline long random(long max) { return rand() % max; }
 inline long random(long min, long max) { return min + rand() % (max - min); }
