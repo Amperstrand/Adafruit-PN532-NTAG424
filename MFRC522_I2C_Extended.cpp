@@ -430,7 +430,11 @@ bool MFRC522_I2C_Extended::PICC_IsNewCardPresent() {
 
   byte bufferATQA[2] = {0};
   byte bufferSize = sizeof(bufferATQA);
-  const StatusCode status = PICC_RequestA(bufferATQA, &bufferSize);
+  StatusCode status = PICC_RequestA(bufferATQA, &bufferSize);
+  if (status != STATUS_OK && status != STATUS_COLLISION) {
+    bufferSize = sizeof(bufferATQA);
+    status = PICC_WakeupA(bufferATQA, &bufferSize);
+  }
   if (status == STATUS_OK || status == STATUS_COLLISION) {
     clearTag();
     tag.atqa = static_cast<uint16_t>((bufferATQA[1] << 8) | bufferATQA[0]);
