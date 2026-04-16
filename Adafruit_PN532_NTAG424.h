@@ -22,13 +22,21 @@
 #include <stddef.h>
 #include <string.h>
 
+#if __has_include(<SPI.h>)
+#include <SPI.h>
+#endif
+
+#if __has_include(<Wire.h>)
+#include <Wire.h>
+#endif
+
 #if defined(ARDUINO) || __has_include("Arduino.h")
 #include "aescmac.h"
 #include "mbedtls/aes.h"
 #include <Arduino_CRC32.h>
 #endif
 
-#include "ntag424_core.h"
+#include "ntag424_handler.h"
 #include "pn532_ntag424_adapter.h"
 
 #if __has_include(<Adafruit_I2CDevice.h>)
@@ -248,7 +256,7 @@ inline int digitalRead(uint8_t) { return 0; }
 /**
  * @brief Class for working with Adafruit PN532 NFC/RFID breakout boards.
  */
-class Adafruit_PN532 {
+class Adafruit_PN532 : public NTAG424_Handler {
 public:
   Adafruit_PN532(uint8_t clk, uint8_t miso, uint8_t mosi,
                  uint8_t ss);                          // Software SPI
@@ -304,7 +312,6 @@ public:
   uint8_t mifareultralight_ReadPage(uint8_t page, uint8_t *buffer);
   uint8_t mifareultralight_WritePage(uint8_t page, uint8_t *data);
 
-  // NTAG424 functions
   uint8_t ntag424_apdu_send(uint8_t *cla, uint8_t *ins, uint8_t *p1,
                             uint8_t *p2, uint8_t *cmd_header,
                             uint8_t cmd_header_length, uint8_t *cmd_data,
@@ -354,27 +361,13 @@ public:
   int16_t ntag424_ReadNDEFMessage(uint8_t *buffer, uint16_t maxsize);
   uint8_t ntag424_ISOReadFile(uint8_t *buffer, int maxsize);
   uint8_t ntag424_ISOReadBinary(uint16_t offset, uint8_t le, uint8_t *response,
-                                  uint16_t response_bufsize);
+                                uint16_t response_bufsize);
   bool ntag424_FormatNDEF();
   bool ntag424_ISOUpdateBinary(uint8_t *buffer, uint8_t length);
   bool ntag424_ISOSelectFileById(int fileid);
   bool ntag424_ISOSelectFileByDFN(uint8_t *dfn);
   uint8_t ntag424_isNTAG424();
   uint8_t ntag424_GetVersion();
-
-// NTAG424 authresponse data
-  uint8_t ntag424_authresponse_TI[NTAG424_AUTHRESPONSE_TI_SIZE]; ///< TI Buffer
-  uint8_t ntag424_authresponse_RNDA[NTAG424_AUTHRESPONSE_RNDA_SIZE]; ///< RNDA
-                                                                     ///< Buffer
-  uint8_t
-      ntag424_authresponse_PDCAP2[NTAG424_AUTHRESPONSE_PDCAP2_SIZE]; ///< PDCAP2
-                                                                     ///< Buffer
-  uint8_t ntag424_authresponse_PCDCAP2
-      [NTAG424_AUTHRESPONSE_PCDCAP2_SIZE]; ///< PCDCAP2 Buffer
-
-  ntag424_SessionType ntag424_Session; ///< authentication session data are stored here
-
-  ntag424_VersionInfoType ntag424_VersionInfo; ///< global version info
 
   // NTAG2xx functions
   uint8_t ntag2xx_ReadPage(uint8_t page, uint8_t *buffer);

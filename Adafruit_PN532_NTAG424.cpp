@@ -108,6 +108,7 @@ byte pn532_packetbuffer[PN532_PACKBUFFSIZ]; ///< Packet buffer used in various
 Adafruit_PN532::Adafruit_PN532(uint8_t clk, uint8_t miso, uint8_t mosi,
                                uint8_t ss)
     : _ntag424_adapter(this) {
+  attach_reader(&_ntag424_adapter);
   _cs = ss;
   spi_dev = new Adafruit_SPIDevice(ss, clk, miso, mosi, 100000,
                                    SPI_BITORDER_LSBFIRST, SPI_MODE0);
@@ -124,6 +125,7 @@ Adafruit_PN532::Adafruit_PN532(uint8_t clk, uint8_t miso, uint8_t mosi,
 /**************************************************************************/
 Adafruit_PN532::Adafruit_PN532(uint8_t irq, uint8_t reset, TwoWire *theWire)
     : _irq(irq), _reset(reset), _ntag424_adapter(this) {
+  attach_reader(&_ntag424_adapter);
   pinMode(_irq, INPUT);
   pinMode(_reset, OUTPUT);
   i2c_dev = new Adafruit_I2CDevice(PN532_I2C_ADDRESS, theWire);
@@ -139,6 +141,7 @@ Adafruit_PN532::Adafruit_PN532(uint8_t irq, uint8_t reset, TwoWire *theWire)
 /**************************************************************************/
 Adafruit_PN532::Adafruit_PN532(uint8_t ss, SPIClass *theSPI)
     : _ntag424_adapter(this) {
+  attach_reader(&_ntag424_adapter);
   _cs = ss;
   spi_dev = new Adafruit_SPIDevice(ss, 500000, SPI_BITORDER_LSBFIRST, SPI_MODE0,
                                    theSPI);
@@ -154,6 +157,7 @@ Adafruit_PN532::Adafruit_PN532(uint8_t ss, SPIClass *theSPI)
 /**************************************************************************/
 Adafruit_PN532::Adafruit_PN532(uint8_t reset, HardwareSerial *theSer)
     : _reset(reset), _ntag424_adapter(this) {
+  attach_reader(&_ntag424_adapter);
   pinMode(_reset, OUTPUT);
   ser_dev = theSer;
 }
@@ -1315,7 +1319,7 @@ uint8_t Adafruit_PN532::mifareultralight_WritePage(uint8_t page,
 */
 /**************************************************************************/
 void Adafruit_PN532::ntag424_random(uint8_t *output, uint8_t bytecount) {
-  ::ntag424_random(output, bytecount);
+  NTAG424_Handler::ntag424_random(output, bytecount);
 }
 
 /**************************************************************************/
@@ -1342,37 +1346,9 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     uint8_t *cla, uint8_t *ins, uint8_t *p1, uint8_t *p2, uint8_t *cmd_header,
     uint8_t cmd_header_length, uint8_t *cmd_data, uint8_t cmd_data_length,
     uint8_t le, uint8_t comm_mode, uint8_t *response, uint8_t response_le) {
-  if (cla == nullptr || ins == nullptr || p1 == nullptr || p2 == nullptr ||
-      response == nullptr || response_le == 0) {
-    return 0;
-  }
-  uint8_t apdu[80] = {0};
-  const uint8_t apdu_length = ::ntag424_build_apdu(
-      cla[0], ins[0], p1[0], p2[0], cmd_header, cmd_header_length, cmd_data,
-      cmd_data_length, le, comm_mode, &ntag424_Session,
-      ntag424_authresponse_TI, apdu);
-  if (apdu_length == 0) {
-    return 0;
-  }
-
-  uint8_t raw_response[80] = {0};
-  const uint8_t raw_response_length =
-      _ntag424_adapter.transceive(apdu, apdu_length, raw_response,
-                                  sizeof(raw_response));
-  if (raw_response_length == 0) {
-    return 0;
-  }
-
-  uint8_t processed_response[80] = {0};
-  const uint8_t processed_response_length = ::ntag424_process_response(
-      raw_response, raw_response_length, comm_mode, &ntag424_Session,
-      ntag424_authresponse_TI, processed_response);
-  if (processed_response_length == 0 || processed_response_length > response_le) {
-    return 0;
-  }
-
-  memcpy(response, processed_response, processed_response_length);
-  return processed_response_length;
+  return NTAG424_Handler::ntag424_apdu_send(
+      cla, ins, p1, p2, cmd_header, cmd_header_length, cmd_data,
+      cmd_data_length, le, comm_mode, response, response_le);
 }
 
 /**************************************************************************/
@@ -1390,7 +1366,8 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
 uint8_t Adafruit_PN532::ntag424_addpadding(uint8_t inputlength,
                                            uint8_t paddinglength,
                                            uint8_t *buffer) {
-  return ::ntag424_addpadding(inputlength, paddinglength, buffer);
+  return NTAG424_Handler::ntag424_addpadding(inputlength, paddinglength,
+                                             buffer);
 }
 
 /**************************************************************************/
@@ -1407,7 +1384,7 @@ uint8_t Adafruit_PN532::ntag424_addpadding(uint8_t inputlength,
 /**************************************************************************/
 uint8_t Adafruit_PN532::ntag424_encrypt(uint8_t *key, uint8_t length,
                                         uint8_t *input, uint8_t *output) {
-  return ::ntag424_encrypt(key, length, input, output);
+  return NTAG424_Handler::ntag424_encrypt(key, length, input, output);
 }
 
 /**************************************************************************/
@@ -1427,7 +1404,7 @@ uint8_t Adafruit_PN532::ntag424_encrypt(uint8_t *key, uint8_t length,
 uint8_t Adafruit_PN532::ntag424_encrypt(uint8_t *key, uint8_t *iv,
                                         uint8_t length, uint8_t *input,
                                         uint8_t *output) {
-  return ::ntag424_encrypt(key, iv, length, input, output);
+  return NTAG424_Handler::ntag424_encrypt(key, iv, length, input, output);
 }
 
 /**************************************************************************/
@@ -1444,7 +1421,7 @@ uint8_t Adafruit_PN532::ntag424_encrypt(uint8_t *key, uint8_t *iv,
 /**************************************************************************/
 uint8_t Adafruit_PN532::ntag424_decrypt(uint8_t *key, uint8_t length,
                                         uint8_t *input, uint8_t *output) {
-  return ::ntag424_decrypt(key, length, input, output);
+  return NTAG424_Handler::ntag424_decrypt(key, length, input, output);
 }
 
 /**************************************************************************/
@@ -1463,7 +1440,7 @@ uint8_t Adafruit_PN532::ntag424_decrypt(uint8_t *key, uint8_t length,
 uint8_t Adafruit_PN532::ntag424_decrypt(uint8_t *key, uint8_t *iv,
                                         uint8_t length, uint8_t *input,
                                         uint8_t *output) {
-  return ::ntag424_decrypt(key, iv, length, input, output);
+  return NTAG424_Handler::ntag424_decrypt(key, iv, length, input, output);
 }
 
 /**************************************************************************/
@@ -1480,7 +1457,7 @@ uint8_t Adafruit_PN532::ntag424_decrypt(uint8_t *key, uint8_t *iv,
 /**************************************************************************/
 uint8_t Adafruit_PN532::ntag424_cmac_short(uint8_t *key, uint8_t *input,
                                            uint8_t length, uint8_t *cmac) {
-  return ::ntag424_cmac_short(key, input, length, cmac);
+  return NTAG424_Handler::ntag424_cmac_short(key, input, length, cmac);
 }
 
 /**************************************************************************/
@@ -1498,7 +1475,7 @@ uint8_t Adafruit_PN532::ntag424_cmac_short(uint8_t *key, uint8_t *input,
 
 uint8_t Adafruit_PN532::ntag424_cmac(uint8_t *key, uint8_t *input,
                                      uint8_t length, uint8_t *cmac) {
-  return ::ntag424_cmac(key, input, length, cmac);
+  return NTAG424_Handler::ntag424_cmac(key, input, length, cmac);
 }
 
 /**************************************************************************/
@@ -1520,8 +1497,8 @@ uint8_t Adafruit_PN532::ntag424_MAC(uint8_t *cmd, uint8_t *cmdheader,
                                     uint8_t cmdheader_length, uint8_t *cmddata,
                                     uint8_t cmddata_length,
                                     uint8_t *signature) {
-  return ::ntag424_MAC(&ntag424_Session, cmd, cmdheader, cmdheader_length,
-                       cmddata, cmddata_length, signature);
+  return NTAG424_Handler::ntag424_MAC(cmd, cmdheader, cmdheader_length,
+                                      cmddata, cmddata_length, signature);
 }
 
 /**************************************************************************/
@@ -1544,8 +1521,8 @@ uint8_t Adafruit_PN532::ntag424_MAC(uint8_t *key, uint8_t *cmd,
                                     uint8_t cmdheader_length, uint8_t *cmddata,
                                     uint8_t cmddata_length,
                                     uint8_t *signature) {
-  return ::ntag424_MAC(&ntag424_Session, key, cmd, cmdheader,
-                       cmdheader_length, cmddata, cmddata_length, signature);
+  return NTAG424_Handler::ntag424_MAC(key, cmd, cmdheader, cmdheader_length,
+                                      cmddata, cmddata_length, signature);
 }
 
 /**************************************************************************/
@@ -1561,7 +1538,7 @@ uint8_t Adafruit_PN532::ntag424_MAC(uint8_t *key, uint8_t *cmd,
 /**************************************************************************/
 void Adafruit_PN532::ntag424_derive_session_keys(uint8_t *key, uint8_t *RndA,
                                                  uint8_t *RndB) {
-  ::ntag424_derive_session_keys(&ntag424_Session, key, RndA, RndB);
+  NTAG424_Handler::ntag424_derive_session_keys(key, RndA, RndB);
 }
 
 /**************************************************************************/
@@ -1576,7 +1553,7 @@ void Adafruit_PN532::ntag424_derive_session_keys(uint8_t *key, uint8_t *RndA,
 /**************************************************************************/
 
 uint32_t Adafruit_PN532::ntag424_crc32(uint8_t *data, uint8_t datalength) {
-  return ::ntag424_crc32(data, datalength);
+  return NTAG424_Handler::ntag424_crc32(data, datalength);
 }
 
 /**************************************************************************/
@@ -1595,7 +1572,7 @@ uint32_t Adafruit_PN532::ntag424_crc32(uint8_t *data, uint8_t datalength) {
 
 uint8_t Adafruit_PN532::ntag424_rotl(uint8_t *input, uint8_t *output,
                                      uint8_t bufferlen, uint8_t rotation) {
-  return ::ntag424_rotl(input, output, bufferlen, rotation);
+  return NTAG424_Handler::ntag424_rotl(input, output, bufferlen, rotation);
 }
 
 /*!
@@ -1611,8 +1588,7 @@ uint8_t Adafruit_PN532::ntag424_rotl(uint8_t *input, uint8_t *output,
 
 uint8_t Adafruit_PN532::ntag424_Authenticate(uint8_t *key, uint8_t keyno,
                                              uint8_t cmd) {
-  return ::ntag424_Authenticate(&_ntag424_adapter, &ntag424_Session,
-                                ntag424_authresponse_TI, key, keyno, cmd);
+  return NTAG424_Handler::ntag424_Authenticate(key, keyno, cmd);
 }
 
 /*!
@@ -1629,9 +1605,7 @@ uint8_t Adafruit_PN532::ntag424_Authenticate(uint8_t *key, uint8_t keyno,
 /**************************************************************************/
 uint8_t Adafruit_PN532::ntag424_GetFileSettings(uint8_t fileno, uint8_t *buffer,
                                                 uint8_t comm_mode) {
-  return ::ntag424_GetFileSettings(&_ntag424_adapter, &ntag424_Session,
-                                   ntag424_authresponse_TI, fileno, buffer,
-                                   comm_mode);
+  return NTAG424_Handler::ntag424_GetFileSettings(fileno, buffer, comm_mode);
 }
 
 /*!
@@ -1650,9 +1624,8 @@ uint8_t Adafruit_PN532::ntag424_ChangeFileSettings(uint8_t fileno,
                                                    uint8_t *filesettings,
                                                    uint8_t filesettings_length,
                                                    uint8_t comm_mode) {
-  return ::ntag424_ChangeFileSettings(
-      &_ntag424_adapter, &ntag424_Session, ntag424_authresponse_TI, fileno,
-      filesettings, filesettings_length, comm_mode);
+  return NTAG424_Handler::ntag424_ChangeFileSettings(
+      fileno, filesettings, filesettings_length, comm_mode);
 }
 
 /*!
@@ -1668,9 +1641,8 @@ uint8_t Adafruit_PN532::ntag424_ChangeFileSettings(uint8_t fileno,
 /**************************************************************************/
 uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
                                           uint8_t keynumber, uint8_t keyversion) {
-  return ::ntag424_ChangeKey(&_ntag424_adapter, &ntag424_Session,
-                             ntag424_authresponse_TI, oldkey, newkey,
-                             keynumber, keyversion);
+  return NTAG424_Handler::ntag424_ChangeKey(oldkey, newkey, keynumber,
+                                            keyversion);
 }
 
 /*!
@@ -1683,13 +1655,11 @@ uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
 */
 /**************************************************************************/
 uint8_t Adafruit_PN532::ntag424_GetCardUID(uint8_t *buffer) {
-  return ::ntag424_GetCardUID(&_ntag424_adapter, &ntag424_Session,
-                              ntag424_authresponse_TI, buffer);
+  return NTAG424_Handler::ntag424_GetCardUID(buffer);
 }
 
 bool Adafruit_PN532::ntag424_GetKeyVersion(uint8_t keyno, uint8_t *version) {
-  return ::ntag424_GetKeyVersion(&_ntag424_adapter, &ntag424_Session,
-                                 ntag424_authresponse_TI, keyno, version);
+  return NTAG424_Handler::ntag424_GetKeyVersion(keyno, version);
 }
 
 /*!
@@ -1702,8 +1672,7 @@ bool Adafruit_PN532::ntag424_GetKeyVersion(uint8_t keyno, uint8_t *version) {
 */
 /**************************************************************************/
 uint8_t Adafruit_PN532::ntag424_GetTTStatus(uint8_t *buffer) {
-  return ::ntag424_GetTTStatus(&_ntag424_adapter, &ntag424_Session,
-                               ntag424_authresponse_TI, buffer);
+  return NTAG424_Handler::ntag424_GetTTStatus(buffer);
 }
 
 /*!
@@ -1718,8 +1687,7 @@ uint8_t Adafruit_PN532::ntag424_GetTTStatus(uint8_t *buffer) {
 // ReadSig response exceeds sizeof(pn532_packetbuffer) and needs
 // multi-frame reading (NextFrame). Not yet implemented.
 uint8_t Adafruit_PN532::ntag424_ReadSig(uint8_t *buffer) {
-  return ::ntag424_ReadSig(&_ntag424_adapter, &ntag424_Session,
-                           ntag424_authresponse_TI, buffer);
+  return NTAG424_Handler::ntag424_ReadSig(buffer);
 }
 
 /*!
@@ -1735,7 +1703,7 @@ uint8_t Adafruit_PN532::ntag424_ReadSig(uint8_t *buffer) {
 /**************************************************************************/
 uint8_t Adafruit_PN532::ntag424_ReadData(uint8_t *buffer, int fileno,
                                          int offset, int size) {
-  return ::ntag424_ReadData(&_ntag424_adapter, buffer, fileno, offset, size);
+  return NTAG424_Handler::ntag424_ReadData(buffer, fileno, offset, size);
 }
 
 /*!
@@ -1746,8 +1714,7 @@ uint8_t Adafruit_PN532::ntag424_ReadData(uint8_t *buffer, int fileno,
 /**************************************************************************/
 
 uint8_t Adafruit_PN532::ntag424_isNTAG424() {
-  return ::ntag424_isNTAG424(&_ntag424_adapter, &ntag424_Session,
-                             &ntag424_VersionInfo);
+  return NTAG424_Handler::ntag424_isNTAG424();
 }
 
 /*!
@@ -1758,7 +1725,7 @@ uint8_t Adafruit_PN532::ntag424_isNTAG424() {
 */
 /**************************************************************************/
 uint8_t Adafruit_PN532::ntag424_GetVersion() {
-  return ::ntag424_GetVersion(&_ntag424_adapter, &ntag424_VersionInfo);
+  return NTAG424_Handler::ntag424_GetVersion();
 }
 
 /*!
@@ -1768,7 +1735,7 @@ uint8_t Adafruit_PN532::ntag424_GetVersion() {
 */
 /**************************************************************************/
 bool Adafruit_PN532::ntag424_FormatNDEF() {
-  return ::ntag424_FormatNDEF(&_ntag424_adapter);
+  return NTAG424_Handler::ntag424_FormatNDEF();
 }
 
 /*!
@@ -1782,7 +1749,7 @@ bool Adafruit_PN532::ntag424_FormatNDEF() {
 /**************************************************************************/
 bool Adafruit_PN532::ntag424_ISOUpdateBinary(uint8_t *data_to_write,
                                              uint8_t length) {
-  return ::ntag424_ISOUpdateBinary(&_ntag424_adapter, data_to_write, length);
+  return NTAG424_Handler::ntag424_ISOUpdateBinary(data_to_write, length);
 }
 
 /*!
@@ -1794,8 +1761,7 @@ bool Adafruit_PN532::ntag424_ISOUpdateBinary(uint8_t *data_to_write,
 */
 /**************************************************************************/
 bool Adafruit_PN532::ntag424_ISOSelectFileById(int fileid) {
-  return ::ntag424_ISOSelectFileById(&_ntag424_adapter, &ntag424_Session,
-                                     ntag424_authresponse_TI, fileid);
+  return NTAG424_Handler::ntag424_ISOSelectFileById(fileid);
 }
 
 /*!
@@ -1808,23 +1774,20 @@ bool Adafruit_PN532::ntag424_ISOSelectFileById(int fileid) {
 */
 /**************************************************************************/
 bool Adafruit_PN532::ntag424_ISOSelectFileByDFN(uint8_t *dfn) {
-  return ::ntag424_ISOSelectFileByDFN(&_ntag424_adapter, &ntag424_Session,
-                                      ntag424_authresponse_TI, dfn);
+  return NTAG424_Handler::ntag424_ISOSelectFileByDFN(dfn);
 }
 
 bool Adafruit_PN532::ntag424_ISOSelectCCFile() {
-  return ::ntag424_ISOSelectCCFile(&_ntag424_adapter, &ntag424_Session,
-                                   ntag424_authresponse_TI);
+  return NTAG424_Handler::ntag424_ISOSelectCCFile();
 }
 
 bool Adafruit_PN532::ntag424_ISOSelectNDEFFile() {
-  return ::ntag424_ISOSelectNDEFFile(&_ntag424_adapter, &ntag424_Session,
-                                     ntag424_authresponse_TI);
+  return NTAG424_Handler::ntag424_ISOSelectNDEFFile();
 }
 
 int16_t Adafruit_PN532::ntag424_ReadNDEFMessage(uint8_t *buffer,
                                                 uint16_t maxsize) {
-  return ::ntag424_ReadNDEFMessage(&_ntag424_adapter, buffer, maxsize);
+  return NTAG424_Handler::ntag424_ReadNDEFMessage(buffer, maxsize);
 }
 
 /*!
@@ -1837,7 +1800,7 @@ int16_t Adafruit_PN532::ntag424_ReadNDEFMessage(uint8_t *buffer,
 */
 /**************************************************************************/
 uint8_t Adafruit_PN532::ntag424_ISOReadFile(uint8_t *buffer, int maxsize) {
-  return ::ntag424_ISOReadFile(&_ntag424_adapter, buffer, maxsize);
+  return NTAG424_Handler::ntag424_ISOReadFile(buffer, maxsize);
 }
 
 /**************************************************************************/
@@ -1861,8 +1824,8 @@ uint8_t Adafruit_PN532::ntag424_ISOReadFile(uint8_t *buffer, int maxsize) {
 uint8_t Adafruit_PN532::ntag424_ISOReadBinary(uint16_t offset, uint8_t le,
                                                 uint8_t *response,
                                                 uint16_t response_bufsize) {
-  return ::ntag424_ISOReadBinary(&_ntag424_adapter, offset, le, response,
-                                 response_bufsize);
+  return NTAG424_Handler::ntag424_ISOReadBinary(offset, le, response,
+                                                response_bufsize);
 }
 
 /***** NTAG2xx Functions ******/
