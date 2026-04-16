@@ -1,7 +1,47 @@
 #include "MFRC522_I2C.h"
 
+#if defined(ARDUINO)
+#include <Wire.h>
+#endif
+
 MFRC522_I2C::MFRC522_I2C(byte chipAddress, TwoWire *wire)
     : _chipAddress(chipAddress), _wire(wire != nullptr ? wire : &Wire) {}
+
+bool MFRC522_I2C::PCD_WriteRegisterChecked(byte reg, byte value) {
+  if (_wire == nullptr) {
+    return false;
+  }
+
+  _wire->beginTransmission(_chipAddress);
+  if (_wire->write(reg) != 1 || _wire->write(value) != 1) {
+    return false;
+  }
+  return _wire->endTransmission() == 0;
+}
+
+bool MFRC522_I2C::PCD_ReadRegisterChecked(byte reg, byte *value) {
+  if (_wire == nullptr || value == nullptr) {
+    return false;
+  }
+
+  *value = 0;
+  _wire->beginTransmission(_chipAddress);
+  if (_wire->write(reg) != 1) {
+    return false;
+  }
+  if (_wire->endTransmission() != 0) {
+    return false;
+  }
+  if (_wire->requestFrom(_chipAddress, static_cast<size_t>(1)) != 1) {
+    return false;
+  }
+  if (!_wire->available()) {
+    return false;
+  }
+
+  *value = static_cast<byte>(_wire->read());
+  return true;
+}
 
 void MFRC522_I2C::PCD_WriteRegister(byte reg, byte value) {
   if (_wire == nullptr) {
@@ -111,27 +151,41 @@ MFRC522_I2C::StatusCode MFRC522_I2C::PCD_CalculateCRC(const byte *data,
   return STATUS_TIMEOUT;
 }
 
-void MFRC522_I2C::PCD_Init() {
-  PCD_Reset();
-  PCD_WriteRegister(TModeReg, 0x80);
-  PCD_WriteRegister(TPrescalerReg, 0xA9);
-  PCD_WriteRegister(TReloadRegH, 0x03);
-  PCD_WriteRegister(TReloadRegL, 0xE8);
-  PCD_WriteRegister(TxASKReg, 0x40);
-  PCD_WriteRegister(ModeReg, 0x3D);
-  PCD_AntennaOn();
-  clearTag();
+bool MFRC522_I2C::PCD_Init() {
+  if (!PCD_Reset()) {
+    return false;
+  }
+  return PCD_ConfigureDefaults();
 }
 
-void MFRC522_I2C::PCD_Reset() {
-  PCD_WriteRegister(CommandReg, PCD_SoftReset);
+bool MFRC522_I2C::PCD_ConfigureDefaults() {
+  if (!PCD_WriteRegisterChecked(TModeReg, 0x80) ||
+      !PCD_WriteRegisterChecked(TPrescalerReg, 0xA9) ||
+      !PCD_WriteRegisterChecked(TReloadRegH, 0x03) ||
+      !PCD_WriteRegisterChecked(TReloadRegL, 0xE8) ||
+      !PCD_WriteRegisterChecked(TxASKReg, 0x40) ||
+      !PCD_WriteRegisterChecked(ModeReg, 0x3D)) {
+    return false;
+  }
+  PCD_AntennaOn();
+  clearTag();
+  return true;
+}
+
+bool MFRC522_I2C::PCD_Reset() {
+  if (!PCD_WriteRegisterChecked(CommandReg, PCD_SoftReset)) {
+    return false;
+  }
   delay(50);
   for (uint8_t retries = 0; retries < 100; ++retries) {
-    if ((PCD_ReadRegister(CommandReg) & (1U << 4)) == 0) {
-      break;
+    byte command = 0;
+    if (PCD_ReadRegisterChecked(CommandReg, &command) &&
+        (command & (1U << 4)) == 0) {
+      return true;
     }
     delay(1);
   }
+  return false;
 }
 
 void MFRC522_I2C::PCD_AntennaOn() {

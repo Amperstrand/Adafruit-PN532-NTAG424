@@ -27,8 +27,9 @@ inline void delayMicroseconds(unsigned int) {}
 
 #include <string.h>
 
-#if __has_include(<Wire.h>)
-#include <Wire.h>
+#if defined(ARDUINO)
+class TwoWire;
+extern TwoWire Wire;
 #else
 class TwoWire {
 public:
@@ -177,12 +178,15 @@ public:
   void PCD_WriteRegister(byte reg, byte count, const byte *values);
   byte PCD_ReadRegister(byte reg);
   void PCD_ReadRegister(byte reg, byte count, byte *values, byte rxAlign = 0);
+  bool PCD_WriteRegisterChecked(byte reg, byte value);
+  bool PCD_ReadRegisterChecked(byte reg, byte *value);
   void PCD_SetRegisterBitMask(byte reg, byte mask);
   void PCD_ClearRegisterBitMask(byte reg, byte mask);
   StatusCode PCD_CalculateCRC(const byte *data, byte length, byte *result);
 
-  void PCD_Init();
-  void PCD_Reset();
+  bool PCD_Init();
+  bool PCD_Reset();
+  bool PCD_ConfigureDefaults();
   void PCD_AntennaOn();
   void PCD_AntennaOff();
 
