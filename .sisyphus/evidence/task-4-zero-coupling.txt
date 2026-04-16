@@ -1,0 +1,5 @@
+Command: grep -c 'PN532\|pn532\|Adafruit\|sendCommandCheckAck\|readdata\|packetbuffer' ntag424_apdu.h ntag424_apdu.cpp
+Workdir: /home/ubuntu/src/pn532/Adafruit-PN532-NTAG424
+Output:
+ntag424_apdu.h:0
+ntag424_apdu.cpp:0
