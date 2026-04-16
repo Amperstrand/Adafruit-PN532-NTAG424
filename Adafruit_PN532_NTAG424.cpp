@@ -111,7 +111,7 @@ Adafruit_PN532::Adafruit_PN532(uint8_t clk, uint8_t miso, uint8_t mosi,
   attach_reader(&_ntag424_adapter);
   _cs = ss;
   spi_dev = new Adafruit_SPIDevice(ss, clk, miso, mosi, 100000,
-                                   SPI_BITORDER_LSBFIRST, SPI_MODE0);
+                                   0, SPI_MODE0);
 }
 
 /**************************************************************************/
@@ -143,7 +143,7 @@ Adafruit_PN532::Adafruit_PN532(uint8_t ss, SPIClass *theSPI)
     : _ntag424_adapter(this) {
   attach_reader(&_ntag424_adapter);
   _cs = ss;
-  spi_dev = new Adafruit_SPIDevice(ss, 500000, SPI_BITORDER_LSBFIRST, SPI_MODE0,
+  spi_dev = new Adafruit_SPIDevice(ss, 500000, 0, SPI_MODE0,
                                    theSPI);
 }
 

@@ -22,13 +22,9 @@
 #include <stddef.h>
 #include <string.h>
 
-#if __has_include(<SPI.h>)
-#include <SPI.h>
-#endif
-
-#if __has_include(<Wire.h>)
-#include <Wire.h>
-#endif
+class SPIClass;
+class TwoWire;
+class HardwareSerial;
 
 #if defined(ARDUINO) || __has_include("Arduino.h")
 #include "aescmac.h"
@@ -83,6 +79,7 @@ typedef uint8_t byte;
 #ifndef SPI_MODE0
 #define SPI_MODE0 0
 #endif
+
 #ifndef HEX
 #define HEX 16
 #endif
@@ -107,6 +104,33 @@ inline TwoWire Wire;
 #if !__has_include("Arduino.h")
 #ifndef LOW
 #define LOW 0
+#endif
+
+extern SPIClass SPI;
+extern TwoWire Wire;
+
+#ifndef SPI_BITORDER_LSBFIRST
+#ifdef LSBFIRST
+#define SPI_BITORDER_LSBFIRST LSBFIRST
+#else
+#define SPI_BITORDER_LSBFIRST 0
+#endif
+#endif
+
+#ifndef SPI_MODE0
+#define SPI_MODE0 0
+#endif
+
+#ifndef SPI_BITORDER_LSBFIRST
+#ifdef LSBFIRST
+#define SPI_BITORDER_LSBFIRST LSBFIRST
+#else
+#define SPI_BITORDER_LSBFIRST 0
+#endif
+#endif
+
+#ifndef SPI_MODE0
+#define SPI_MODE0 0
 #endif
 #ifndef HIGH
 #define HIGH 1
@@ -260,9 +284,9 @@ class Adafruit_PN532 : public NTAG424_Handler {
 public:
   Adafruit_PN532(uint8_t clk, uint8_t miso, uint8_t mosi,
                  uint8_t ss);                          // Software SPI
-  Adafruit_PN532(uint8_t ss, SPIClass *theSPI = &SPI); // Hardware SPI
+  Adafruit_PN532(uint8_t ss, SPIClass *theSPI = nullptr); // Hardware SPI
   Adafruit_PN532(uint8_t irq, uint8_t reset,
-                 TwoWire *theWire = &Wire);              // Hardware I2C
+                 TwoWire *theWire = nullptr);              // Hardware I2C
   Adafruit_PN532(uint8_t reset, HardwareSerial *theSer); // Hardware UART
   bool begin(void);
 
