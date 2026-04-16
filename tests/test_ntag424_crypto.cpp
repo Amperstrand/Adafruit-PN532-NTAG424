@@ -4,8 +4,6 @@
 
 #include "../ntag424_crypto.h"
 
-uint8_t ntag424_authresponse_TI[NTAG424_AUTHRESPONSE_TI_SIZE] = {0x00, 0x00, 0x00, 0x00};
-
 namespace {
 
 int fail(const char *message) {

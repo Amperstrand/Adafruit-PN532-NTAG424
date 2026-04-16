@@ -4,8 +4,6 @@
 
 #include "../ntag424_apdu.h"
 
-uint8_t ntag424_authresponse_TI[NTAG424_AUTHRESPONSE_TI_SIZE] = {0x00, 0x00, 0x00, 0x00};
-
 // --- Mock reader ---
 class MockReader : public NTAG424_Reader {
 public:
@@ -192,7 +190,6 @@ int main() {
         0x00,       // le
         0x00,       // comm_mode = PLAIN
         nullptr,    // session
-        nullptr,    // TI
         apdu);
     if (len == 0) {
       return fail("build_apdu PLAIN no-data should succeed");
@@ -219,7 +216,6 @@ int main() {
         0x00,       // le
         0x00,       // comm_mode = PLAIN
         nullptr,    // session
-        nullptr,    // TI
         apdu);
     if (len == 0) {
       return fail("build_apdu PLAIN with-data should succeed");
@@ -247,7 +243,6 @@ int main() {
         0x00,       // le
         0x00,       // comm_mode = PLAIN
         nullptr,    // session
-        nullptr,    // TI
         apdu);
     if (len == 0) {
       return fail("build_apdu ISO SELECT should succeed");
@@ -267,7 +262,7 @@ int main() {
     uint8_t len = ntag424_build_apdu(
         0x90, 0x30, 0x00, 0x00,
         nullptr, 0, nullptr, 0,
-        0x00, 0x00, nullptr, nullptr, nullptr);
+        0x00, 0x00, nullptr, nullptr);
     if (len != 0) {
       return fail("build_apdu with null output should return 0");
     }
@@ -283,7 +278,6 @@ int main() {
         nullptr, 0, nullptr, 0,
         0x00, 0x01, // comm_mode = MAC
         nullptr,    // session (null)
-        nullptr,    // TI
         apdu);
     if (len != 0) {
       return fail("build_apdu MAC without session should return 0");
@@ -300,7 +294,6 @@ int main() {
         nullptr, 0, nullptr, 0,
         0x00, 0x02, // comm_mode = FULL
         nullptr,    // session (null)
-        nullptr,    // TI
         apdu);
     if (len != 0) {
       return fail("build_apdu FULL without session should return 0");
@@ -313,9 +306,8 @@ int main() {
   {
     uint8_t response[4] = {0xAA, 0xBB, 0x90, 0x00};
     uint8_t processed[4] = {0};
-    uint8_t len = ntag424_process_response(
-        response, 4, 0x00, // comm_mode = PLAIN
-        nullptr, nullptr, processed);
+    uint8_t len =
+        ntag424_process_response(response, 4, 0x00, nullptr, processed);
     if (len != 4) {
       std::fprintf(stderr, "FAIL: process_response PLAIN should return 4, got %d\n", len);
       return 1;
@@ -331,11 +323,11 @@ int main() {
   {
     uint8_t response[4] = {0};
     uint8_t processed[4] = {0};
-    uint8_t len = ntag424_process_response(nullptr, 4, 0x00, nullptr, nullptr, processed);
+    uint8_t len = ntag424_process_response(nullptr, 4, 0x00, nullptr, processed);
     if (len != 0) {
       return fail("process_response null response should return 0");
     }
-    len = ntag424_process_response(response, 4, 0x00, nullptr, nullptr, nullptr);
+    len = ntag424_process_response(response, 4, 0x00, nullptr, nullptr);
     if (len != 0) {
       return fail("process_response null output should return 0");
     }
@@ -351,8 +343,7 @@ int main() {
     reader.canned_length = 2;
 
     uint8_t cmd_data[2] = {0xE1, 0x03};
-    bool result = ntag424_iso_select_file(&reader, 0x04, cmd_data, 2,
-                                          nullptr, nullptr);
+    bool result = ntag424_iso_select_file(&reader, 0x04, cmd_data, 2, nullptr);
     if (!result) {
       return fail("iso_select_file should succeed with 0x9000 response");
     }
@@ -378,8 +369,7 @@ int main() {
     reader.canned_length = 2;
 
     uint8_t cmd_data[2] = {0xE1, 0x03};
-    bool result = ntag424_iso_select_file(&reader, 0x04, cmd_data, 2,
-                                          nullptr, nullptr);
+    bool result = ntag424_iso_select_file(&reader, 0x04, cmd_data, 2, nullptr);
     if (result) {
       return fail("iso_select_file should fail with non-0x9000 response");
     }
@@ -390,8 +380,7 @@ int main() {
   // --- ntag424_iso_select_file null reader ---
   {
     uint8_t cmd_data[2] = {0xE1, 0x03};
-    bool result = ntag424_iso_select_file(nullptr, 0x04, cmd_data, 2,
-                                          nullptr, nullptr);
+    bool result = ntag424_iso_select_file(nullptr, 0x04, cmd_data, 2, nullptr);
     if (result) {
       return fail("iso_select_file with null reader should fail");
     }

@@ -4,8 +4,7 @@
 
 #include "../ntag424_core.h"
 
-uint8_t ntag424_authresponse_TI[NTAG424_AUTHRESPONSE_TI_SIZE] = {0x00, 0x00,
-                                                                 0x00, 0x00};
+// ntag424_authresponse_TI provided by ntag424_core.cpp
 
 class QueueReader : public NTAG424_Reader {
 public:
@@ -169,7 +168,7 @@ int main() {
   {
     QueueReader reader;
     uint8_t buffer[56] = {0};
-    if (ntag424_ReadSig(&reader, nullptr, nullptr, buffer) != 0) {
+    if (ntag424_ReadSig(&reader, nullptr, buffer) != 0) {
       return fail("ReadSig should remain unsupported without multi-frame support");
     }
     if (reader.sent_count != 0) {

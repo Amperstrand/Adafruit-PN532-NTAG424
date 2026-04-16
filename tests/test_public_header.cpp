@@ -6,8 +6,7 @@
 #include "../Adafruit_PN532_NTAG424.h"
 #undef private
 
-uint8_t ntag424_authresponse_TI[NTAG424_AUTHRESPONSE_TI_SIZE] = {0x00, 0x00,
-                                                                 0x00, 0x00};
+// ntag424_authresponse_TI provided by ntag424_core.cpp
 
 namespace {
 

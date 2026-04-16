@@ -42,4 +42,11 @@ inline long random(long min, long max) { return min + rand() % (max - min); }
 #define F(x) (x)
 #define PROGMEM
 
+using byte = uint8_t;
+
+class __FlashStringHelper {};
+
+inline uint8_t pgm_read_byte(const uint8_t *pointer) { return *pointer; }
+inline void delayMicroseconds(unsigned int) {}
+
 #endif
