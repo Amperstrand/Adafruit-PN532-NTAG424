@@ -48,3 +48,10 @@
 - Adapter header forward-declares `Adafruit_PN532`; only the `.cpp` pulls in `Adafruit_PN532_NTAG424.h` to avoid circular includes.
 - `transceive()` mirrors the monolith InDataExchange framing and response extraction exactly, but uses local `pn532_frame` and `resp_buf` arrays instead of the global packet buffer.
 - Added public `getUID()` and `isTagPresent()` accessors on `Adafruit_PN532` so the adapter can expose UID/presence without taking ownership of reader state.
+
+## [2026-04-16] Task 8 thin-wrapper notes
+
+- `Adafruit_PN532_NTAG424.h` now includes `ntag424_core.h` and `pn532_ntag424_adapter.h`, removes duplicated NTAG424 constants/structs, and keeps the public NTAG424 API plus public state members intact.
+- Every NTAG424 method body in `Adafruit_PN532_NTAG424.cpp` is now a thin wrapper that delegates to `::ntag424_*` free functions or uses `_ntag424_adapter.transceive()` + `ntag424_build_apdu()` + `ntag424_process_response()` for `ntag424_apdu_send()`.
+- All four constructors now initialize `_ntag424_adapter(this)` in their member initializer lists, while non-NTAG424 regions before line 1342 and after line 3523 remain untouched.
+- Desktop crypto tests required an internal non-Arduino CRC32 fallback in `ntag424_crypto.cpp` so the host build no longer depends on linking zlib for that target.

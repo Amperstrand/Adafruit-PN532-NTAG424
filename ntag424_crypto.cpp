@@ -12,12 +12,22 @@ void AES128_CMAC(const uint8_t *key, const uint8_t *input, size_t length,
 long random(long max);
 #endif
 
-#if __has_include(<Arduino_CRC32.h>)
+#if defined(ARDUINO) && __has_include(<Arduino_CRC32.h>)
 #include <Arduino_CRC32.h>
 #else
 class Arduino_CRC32 {
 public:
-  uint32_t calc(const uint8_t *data, size_t datalength);
+  uint32_t calc(const uint8_t *data, size_t datalength) {
+    uint32_t crc = 0xFFFFFFFFu;
+    for (size_t i = 0; i < datalength; ++i) {
+      crc ^= data[i];
+      for (uint8_t bit = 0; bit < 8; ++bit) {
+        const uint32_t mask = static_cast<uint32_t>(-(crc & 1u));
+        crc = (crc >> 1) ^ (0xEDB88320u & mask);
+      }
+    }
+    return crc ^ 0xFFFFFFFFu;
+  }
 };
 #endif
 

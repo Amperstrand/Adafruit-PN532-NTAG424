@@ -1,0 +1,6 @@
+uint8_t Adafruit_PN532::ntag424_Authenticate(uint8_t *key, uint8_t keyno,
+  return ::ntag424_Authenticate(&_ntag424_adapter, &ntag424_Session,
+uint8_t Adafruit_PN532::ntag424_GetFileSettings(uint8_t fileno, uint8_t *buffer,
+  return ::ntag424_GetFileSettings(&_ntag424_adapter, &ntag424_Session,
+uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
+  return ::ntag424_ChangeKey(&_ntag424_adapter, &ntag424_Session,

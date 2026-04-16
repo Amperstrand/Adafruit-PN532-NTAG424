@@ -19,35 +19,114 @@
 #include <stdint.h>
 #endif
 
+#include <stddef.h>
+#include <string.h>
+
 #if defined(ARDUINO) || __has_include("Arduino.h")
 #include "aescmac.h"
 #include "mbedtls/aes.h"
 #include <Arduino_CRC32.h>
 #endif
 
+#include "ntag424_core.h"
+#include "pn532_ntag424_adapter.h"
+
 #if __has_include(<Adafruit_I2CDevice.h>)
 #include <Adafruit_I2CDevice.h>
 #else
-class Adafruit_I2CDevice;
+class Adafruit_I2CDevice {
+public:
+  Adafruit_I2CDevice(uint8_t, void *) {}
+  bool begin(bool = true) { return true; }
+  bool read(uint8_t *buffer, size_t len) {
+    if (buffer != nullptr) {
+      memset(buffer, 0, len);
+    }
+    return true;
+  }
+  bool write(const uint8_t *, size_t) { return true; }
+};
 #endif
 
 #if __has_include(<Adafruit_SPIDevice.h>)
 #include <Adafruit_SPIDevice.h>
 #else
-class Adafruit_SPIDevice;
+class Adafruit_SPIDevice {
+public:
+  Adafruit_SPIDevice(uint8_t, uint8_t, uint8_t, uint8_t, uint32_t, uint8_t,
+                     uint8_t) {}
+  Adafruit_SPIDevice(uint8_t, uint32_t, uint8_t, uint8_t, void *) {}
+  bool begin() { return true; }
+  void write_then_read(const uint8_t *, size_t, uint8_t *buffer, size_t len) {
+    if (buffer != nullptr) {
+      memset(buffer, 0, len);
+    }
+  }
+  void write(const uint8_t *, size_t) {}
+  void write_and_read(uint8_t *, size_t) {}
+};
 #endif
 
 #if !defined(ARDUINO)
 typedef uint8_t byte;
+#ifndef SPI_BITORDER_LSBFIRST
+#define SPI_BITORDER_LSBFIRST 0
+#endif
+#ifndef SPI_MODE0
+#define SPI_MODE0 0
+#endif
+#ifndef HEX
+#define HEX 16
+#endif
 class SPIClass {};
 class TwoWire {};
-class HardwareSerial {};
-extern SPIClass SPI;
-extern TwoWire Wire;
-#endif
-#include <string.h>
+class HardwareSerial {
+public:
+  void begin(unsigned long) {}
+  int available() { return 0; }
+  int read() { return 0; }
+  size_t readBytes(uint8_t *buffer, size_t len) {
+    if (buffer != nullptr) {
+      memset(buffer, 0, len);
+    }
+    return len;
+  }
+  size_t write(const uint8_t *, size_t len) { return len; }
+};
+inline SPIClass SPI;
+inline TwoWire Wire;
 
-class PN532_NTAG424_Adapter;
+#if !__has_include("Arduino.h")
+#ifndef LOW
+#define LOW 0
+#endif
+#ifndef HIGH
+#define HIGH 1
+#endif
+#ifndef INPUT
+#define INPUT 0
+#endif
+#ifndef OUTPUT
+#define OUTPUT 1
+#endif
+#ifndef F
+#define F(x) (x)
+#endif
+class SerialStub {
+public:
+  template <typename T> void print(const T &) {}
+  template <typename T> void print(const T &, int) {}
+  template <typename T> void println(const T &) {}
+  template <typename T> void println(const T &, int) {}
+  void println() {}
+};
+inline SerialStub Serial;
+inline void delay(unsigned long) {}
+inline void pinMode(uint8_t, uint8_t) {}
+inline void digitalWrite(uint8_t, uint8_t) {}
+inline int digitalRead(uint8_t) { return 0; }
+#endif
+#endif
 
 #define PN532_PREAMBLE (0x00)   ///< Command sequence start, byte 1/3
 #define PN532_STARTCODE1 (0x00) ///< Command sequence start, byte 2/3
@@ -108,29 +187,6 @@ class PN532_NTAG424_Adapter;
 #define PN532_I2C_READYTIMEOUT (20)   ///< Ready timeout
 
 #define PN532_MIFARE_ISO14443A (0x00) ///< MiFare
-
-// NTAG242 Commands
-#define NTAG424_COMM_MODE_PLAIN (0x00)        ///< Commmode plain
-#define NTAG424_COMM_MODE_MAC (0x01)          ///< Commmode mac
-#define NTAG424_COMM_MODE_FULL (0x02)         ///< Commmode full
-#define NTAG424_COM_CLA (0x90)                ///< CLA prefix
-#define NTAG424_COM_CHANGEKEY (0xC4)          ///< changekey
-#define NTAG424_CMD_READSIG (0x3C)            ///< Read_Sig
-#define NTAG424_CMD_GETTTSTATUS (0xF7)        ///< getttstatus
-#define NTAG424_CMD_GETFILESETTINGS (0xF5)    ///< getfilesettings
-#define NTAG424_CMD_CHANGEFILESETTINGS (0x5F) ///< changefilesettings
-#define NTAG424_CMD_GETCARDUUID (0x51)        ///< getfilesettings
-#define NTAG424_CMD_READDATA (0xAD)           ///< Readdata
-#define NTAG424_CMD_GETVERSION (0x60)         ///< GetVersion
-#define NTAG424_CMD_NEXTFRAME (0xAF)          ///< Nextframe
-
-#define NTAG424_RESPONE_GETVERSION_HWTYPE_NTAG424                              \
-  (0x04) ///< Response value HWType NTAG 424
-
-#define NTAG424_COM_ISOCLA (0x00)          ///< ISO prefix
-#define NTAG424_CMD_ISOSELECTFILE (0xA4)   ///< ISOSelectFile
-#define NTAG424_CMD_ISOREADBINARY (0xB0)   ///< ISOReadBinary
-#define NTAG424_CMD_ISOUPDATEBINARY (0xD6) ///< ISOUpdateBinary
 
 // Mifare Commands
 #define MIFARE_CMD_AUTH_A (0x60)           ///< Auth A
@@ -307,22 +363,6 @@ public:
   uint8_t ntag424_GetVersion();
 
 // NTAG424 authresponse data
-#define NTAG424_AUTHRESPONSE_ENC_SIZE 32    ///< Size of encoded Auth-Response
-#define NTAG424_AUTHRESPONSE_TI_SIZE 4      ///< Size of TI
-#define NTAG424_AUTHRESPONSE_RNDA_SIZE 16   ///< Size of RND
-#define NTAG424_AUTHRESPONSE_PDCAP2_SIZE 6  ///< Size of PDCAP2
-#define NTAG424_AUTHRESPONSE_PCDCAP2_SIZE 6 ///< Size of PCDCAP2
-
-#define NTAG424_AUTHRESPONSE_TI_OFFSET 0 ///< Offset for TI
-#define NTAG424_AUTHRESPONSE_RNDA_OFFSET                                       \
-  NTAG424_AUTHRESPONSE_TI_SIZE ///< Offset for RND
-#define NTAG424_AUTHRESPONSE_PDCAP2_OFFSET                                     \
-  NTAG424_AUTHRESPONSE_TI_SIZE +                                               \
-      NTAG424_AUTHRESPONSE_RNDA_SIZE ///< Offset for PDCAP2
-#define NTAG424_AUTHRESPONSE_PCDCAP2_OFFSET                                    \
-  NTAG424_AUTHRESPONSE_TI_SIZE + NTAG424_AUTHRESPONSE_RNDA_SIZE +              \
-      NTAG424_AUTHRESPONSE_PDCAP2_SIZE ///< Offset for PCDCAP2
-
   uint8_t ntag424_authresponse_TI[NTAG424_AUTHRESPONSE_TI_SIZE]; ///< TI Buffer
   uint8_t ntag424_authresponse_RNDA[NTAG424_AUTHRESPONSE_RNDA_SIZE]; ///< RNDA
                                                                      ///< Buffer
@@ -332,61 +372,9 @@ public:
   uint8_t ntag424_authresponse_PCDCAP2
       [NTAG424_AUTHRESPONSE_PCDCAP2_SIZE]; ///< PCDCAP2 Buffer
 
-#define NTAG424_SESSION_KEYSIZE 16 ///< Size of auth aes keys in byte
+  ntag424_SessionType ntag424_Session; ///< authentication session data are stored here
 
-  struct ntag424_SessionType {
-    bool authenticated;  ///< true = authenticated
-    int16_t cmd_counter; ///< command counter
-    uint8_t
-        session_key_enc[NTAG424_SESSION_KEYSIZE]; ///< session encryption key
-    uint8_t session_key_mac[NTAG424_SESSION_KEYSIZE]; ///< session mac key
-  }; ///< struct type foir the authentication session data
-
-  struct ntag424_SessionType
-      ntag424_Session; ///< authentication session data are stored here
-
-  struct ntag424_VersionInfoType {
-    uint8_t VendorID;       ///< VendorID
-    uint8_t HWType;         ///< HWType
-    uint8_t HWSubType;      ///< HWSubType
-    uint8_t HWMajorVersion; ///< HWMajorVersion
-    uint8_t HWMinorVersion; ///< HWMinorVersion
-    uint8_t HWStorageSize;  ///< HWStorageSize
-    uint8_t HWProtocol;     ///< HWProtocol
-    uint8_t SWType;         ///< SWType
-    uint8_t SWSubType;      ///< SWSubType
-    uint8_t SWMajorVersion; ///< SWMajorVersion
-    uint8_t SWMinorVersion; ///< SWMinorVersion
-    uint8_t SWStorageSize;  ///< SWStorageSize
-    uint8_t SWProtocol;     ///< SWProtocol
-    uint8_t UID[7];         ///< UID
-    uint8_t BatchNo[5];     ///< BatchNo
-    uint8_t FabKey[2];      ///< FabKey
-    uint8_t CWProd;         ///< CWProd
-    uint8_t YearProd;       ///< YearProd
-    uint8_t FabKeyID;       ///< FabKeyID
-  };                        ///< struct type for ntag424 versioninfo
-
-  struct ntag424_VersionInfoType ntag424_VersionInfo; ///< global version info
-
-  struct ntag424_FileSettings {
-    ///<  complex :-(
-    uint8_t FileType;          ///< FileType
-    uint8_t FileOption;        ///< FileOption
-    uint8_t AccessRights;      ///< AccessRights
-    uint8_t FileSize;          ///< FileSize
-    uint8_t SDMOptions;        ///< SDMOptions
-    uint8_t SMDAccessRights;   ///< SMDAccessRights
-    uint8_t UIDOffset;         ///< UIDOffset
-    uint8_t SDMReadCtrOffset;  ///< SDMReadCtrOffset
-    uint8_t PICCDataOffset;    ///< PICCDataOffset
-    uint8_t TTStatusOffset;    ///< TTStatusOffset
-    uint8_t SDMMACInputOffset; ///< SDMMACInputOffset
-    uint8_t SDMENCOffset;      ///< SDMENCOffset
-    uint8_t SDMENCLength;      ///< SDMENCLength
-    uint8_t SDMMACOffset;      ///< SDMMACOffset
-    uint8_t SDMReadCtrlLimit;  ///< SDMReadCtrlLimit
-  };                           ///<  currently not used. filesettings are more
+  ntag424_VersionInfoType ntag424_VersionInfo; ///< global version info
 
   // NTAG2xx functions
   uint8_t ntag2xx_ReadPage(uint8_t page, uint8_t *buffer);
@@ -405,6 +393,7 @@ public:
   int8_t _uidLen;      // uid len
   int8_t _key[6];      // Mifare Classic key
   int8_t _inListedTag; // Tg number of inlisted tag.
+  PN532_NTAG424_Adapter _ntag424_adapter;
 
   // Low level communication functions that handle both SPI and I2C.
   void readdata(uint8_t *buff, uint8_t n);
