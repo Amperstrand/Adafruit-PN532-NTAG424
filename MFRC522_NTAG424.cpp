@@ -1,5 +1,9 @@
 #include "MFRC522_NTAG424.h"
 
+#if defined(ARDUINO)
+#include <Wire.h>
+#endif
+
 MFRC522_NTAG424::MFRC522_NTAG424(uint8_t i2cAddress, TwoWire *wire)
     : MFRC522_I2C_Extended(i2cAddress, wire), _ntag424_adapter(this) {
   attach_reader(&_ntag424_adapter);
@@ -13,8 +17,22 @@ bool MFRC522_NTAG424::begin(bool initWire) {
     _wire->begin();
   }
 
-  PCD_Init();
-  const uint8_t version = PCD_ReadRegister(VersionReg);
+  uint8_t version = 0;
+  const bool pre_read_ok = PCD_ReadRegisterChecked(VersionReg, &version);
+  if (!pre_read_ok || version == 0x00 || version == 0xFF) {
+    return false;
+  }
+  const bool init_ok = PCD_Init();
+  if (!init_ok) {
+    const bool fallback_ok = PCD_ConfigureDefaults();
+    if (!fallback_ok) {
+      return false;
+    }
+  }
+  const bool post_read_ok = PCD_ReadRegisterChecked(VersionReg, &version);
+  if (!post_read_ok) {
+    return false;
+  }
   return version != 0x00 && version != 0xFF;
 }
 
@@ -31,6 +49,16 @@ bool MFRC522_NTAG424::readPassiveTargetID(uint8_t *uidBuffer,
   if (uidLength == nullptr) {
     return false;
   }
+
+  if (isTagPresent()) {
+    if (tag.ats.size > 0) {
+      TCL_Deselect(&tag);
+    }
+    PICC_HaltA();
+    clearTag();
+    delay(5);
+  }
+
   if (!PICC_IsNewCardPresent() || !PICC_ReadCardSerial()) {
     *uidLength = 0;
     return false;
