@@ -2,6 +2,10 @@
 
 #include <string.h>
 
+#if __has_include("Arduino.h")
+#include "Arduino.h"
+#endif
+
 #ifdef NTAG424DEBUG
 #include <HardwareSerial.h>
 #endif
@@ -116,11 +120,42 @@ uint8_t ntag424_Authenticate(NTAG424_Reader *reader,
                            0x05,            keyno, 0x03, 0x00,
                            0x00,            0x00, 0x00};
   uint8_t auth1_response[32] = {0};
-  const uint8_t auth1_length =
-      reader->transceive(auth1, sizeof(auth1), auth1_response,
-                         sizeof(auth1_response));
+  uint8_t auth1_length = 0;
+
+  // Flipper Zero nxp_native_command.h: "Currently not allowed to
+  // authenticate. Keep trying until full delay is spent."  Each 91 AD
+  // response takes ~25ms (65% of FWT=38.66ms).  With 50 retries and
+  // 50ms spacing the total budget is ~5s — enough to ride out most
+  // SpentTimeCtr accumulations without risking TotFailCtr.
+  for (uint8_t delay_retry = 0;
+       delay_retry <= NTAG424_AUTH_DELAY_MAX_RETRIES; ++delay_retry) {
+    memset(auth1_response, 0, sizeof(auth1_response));
+    auth1_length =
+        reader->transceive(auth1, sizeof(auth1), auth1_response,
+                           sizeof(auth1_response));
+    if (ntag424_status_ok(auth1_response, auth1_length, 0x91, 0xAF) &&
+        ntag424_response_data_length(auth1_length) == 16) {
+      break;  // Card accepted auth1 — proceed to auth2.
+    }
+    if (auth1_length >= 2 &&
+        auth1_response[auth1_length - 2] == 0x91 &&
+        auth1_response[auth1_length - 1] == NTAG424_STATUS_AUTH_DELAY_SW2) {
+#ifdef NTAG424DEBUG
+      Serial.print(F("[auth] 91 AD auth delay, retry "));
+      Serial.println(delay_retry + 1);
+#endif
+      delay(50);
+      continue;
+    }
+    // Not 91 AF (good) and not 91 AD (delay) — genuine auth failure.
+    return 0;
+  }
+
   if (!ntag424_status_ok(auth1_response, auth1_length, 0x91, 0xAF) ||
       ntag424_response_data_length(auth1_length) != 16) {
+#ifdef NTAG424DEBUG
+    Serial.println(F("[auth] auth delay retries exhausted"));
+#endif
     return 0;
   }
 

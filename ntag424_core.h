@@ -26,6 +26,15 @@
 #define NTAG424_CMD_ISOSELECTFILE (0xA4)
 #define NTAG424_CMD_ISOREADBINARY (0xB0)
 
+// 91 AD = AUTHENTICATION_DELAY. The card refuses to process auth because
+// its SeqFailCtr ≥ 50 (too many consecutive failed attempts). The card has
+// no RTC — the "delay" is measured in FWT multiples stored in non-volatile
+// EEPROM counters (SpentTimeCtr). Keep retrying until the delay is spent.
+// See AN12196 §6.4 and Flipper Zero nxp_native_command.h:
+//   "Currently not allowed to authenticate. Keep trying until full delay is spent"
+#define NTAG424_STATUS_AUTH_DELAY_SW2 (0xAD)
+#define NTAG424_AUTH_DELAY_MAX_RETRIES 50
+
 #define NTAG424_AUTHRESPONSE_ENC_SIZE 32
 #define NTAG424_AUTHRESPONSE_RNDA_SIZE 16
 #define NTAG424_AUTHRESPONSE_PDCAP2_SIZE 6
