@@ -7,6 +7,7 @@ namespace {
 constexpr uint8_t kNtag424MaxApduSize = 80;
 constexpr uint8_t kIsoApplicationDfn[7] = {0xD2, 0x76, 0x00, 0x00,
                                            0x85, 0x01, 0x01};
+constexpr uint8_t kIsoUpdateBinaryChunkSize = 25;
 
 uint8_t ntag424_send_apdu(NTAG424_Reader *reader, ntag424_SessionType *session,
                           uint8_t cla, uint8_t ins,
@@ -379,14 +380,14 @@ bool ntag424_FormatNDEF(NTAG424_Reader *reader) {
     return false;
   }
 
-  uint8_t ndefdata[54] = {0};
+  uint8_t ndefdata[kIsoUpdateBinaryChunkSize] = {0};
   const uint8_t cmd_header[1] = {0x00};
   uint8_t result[12] = {0};
   bool ret = true;
   const uint8_t memsize = 248;
   uint8_t offset = 0;
-  uint8_t datalen = sizeof(ndefdata);
-  for (int i = 0; i < memsize; i += sizeof(ndefdata)) {
+  uint8_t datalen = kIsoUpdateBinaryChunkSize;
+  while (offset < memsize) {
     if ((offset + datalen) > memsize) {
       datalen = memsize - offset;
     }
@@ -413,7 +414,7 @@ bool ntag424_ISOUpdateBinary(NTAG424_Reader *reader, uint8_t *data_to_write,
   const uint8_t cmd_header[1] = {0x00};
   uint8_t result[12] = {0};
   uint8_t offset = 0;
-  uint8_t datalen = 54;
+  uint8_t datalen = kIsoUpdateBinaryChunkSize;
   for (int i = 0; i < length; i += datalen) {
     if ((offset + datalen) > length) {
       datalen = length - offset;
