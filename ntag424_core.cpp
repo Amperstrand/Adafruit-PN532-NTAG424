@@ -11,7 +11,6 @@ namespace {
 constexpr uint8_t kNtag424MaxApduSize = 80;
 constexpr uint8_t kIsoApplicationDfn[7] = {0xD2, 0x76, 0x00, 0x00,
                                            0x85, 0x01, 0x01};
-constexpr uint8_t kIsoUpdateBinaryChunkSize = 25;
 
 uint8_t ntag424_send_apdu(NTAG424_Reader *reader, ntag424_SessionType *session,
                           uint8_t cla, uint8_t ins,
@@ -33,37 +32,9 @@ uint8_t ntag424_send_apdu(NTAG424_Reader *reader, ntag424_SessionType *session,
     return 0;
   }
 
-#ifdef NTAG424DEBUG
-  if (ins == 0xD6) {
-    Serial.print("[APDU-TX] len=");
-    Serial.print(apdu_length);
-    Serial.print(" hex=");
-    for (uint8_t i = 0; i < apdu_length && i < 12; ++i) {
-      if (apdu[i] < 0x10) Serial.print('0');
-      Serial.print(apdu[i], HEX);
-      Serial.print(' ');
-    }
-    Serial.println();
-  }
-#endif
-
   uint8_t response[kNtag424MaxApduSize] = {0};
   const uint8_t response_length =
       reader->transceive(apdu, apdu_length, response, sizeof(response));
-
-#ifdef NTAG424DEBUG
-  if (ins == 0xD6) {
-    Serial.print("[APDU-RX] len=");
-    Serial.print(response_length);
-    Serial.print(" hex=");
-    for (uint8_t i = 0; i < response_length && i < 12; ++i) {
-      if (response[i] < 0x10) Serial.print('0');
-      Serial.print(response[i], HEX);
-      Serial.print(' ');
-    }
-    Serial.println();
-  }
-#endif
 
   if (response_length == 0) {
     return 0;
@@ -202,144 +173,6 @@ uint8_t ntag424_Authenticate(NTAG424_Reader *reader,
   session->authenticated = true;
   ntag424_derive_session_keys(session, key, RndA, RndB);
   return 1;
-}
-
-uint8_t ntag424_ISOAuthenticate(NTAG424_Reader *reader,
-                                ntag424_SessionType *session, uint8_t *key,
-                                uint8_t keyno) {
-  if (reader == nullptr || session == nullptr || key == nullptr) {
-    return 0;
-  }
-
-  const uint8_t select_file[] = {NTAG424_COM_ISOCLA,
-                                 NTAG424_CMD_ISOSELECTFILE,
-                                 0x04,
-                                 0x00,
-                                 0x07,
-                                 0xD2,
-                                 0x76,
-                                 0x00,
-                                 0x00,
-                                 0x85,
-                                 0x01,
-                                 0x01,
-                                 0x00};
-  uint8_t select_response[16] = {0};
-  const uint8_t select_length = reader->transceive(
-      select_file, sizeof(select_file), select_response, sizeof(select_response));
-  if (!ntag424_status_ok(select_response, select_length, 0x90, 0x00)) {
-    return 0;
-  }
-
-  // ISO GENERAL AUTHENTICATE: CLA=0x00, INS=0x86
-  const uint8_t auth1[] = {0x00, 0x86, 0x00, 0x00,
-                           0x05, keyno, 0x03, 0x00,
-                           0x00, 0x00, 0x00};
-  uint8_t auth1_response[32] = {0};
-  const uint8_t auth1_length =
-      reader->transceive(auth1, sizeof(auth1), auth1_response,
-                         sizeof(auth1_response));
-
-#ifdef NTAG424DEBUG
-  Serial.print("[ISO-AUTH1] resp len=");
-  Serial.print(auth1_length);
-  Serial.print(" hex=");
-  for (uint8_t i = 0; i < auth1_length && i < 20; ++i) {
-    if (auth1_response[i] < 0x10) Serial.print('0');
-    Serial.print(auth1_response[i], HEX);
-    Serial.print(' ');
-  }
-  Serial.println();
-#endif
-
-  // NTAG424 ISO auth uses same 91 AF status (tested empirically)
-  if (auth1_length < 18 ||
-      auth1_response[auth1_length - 2] != 0x91 ||
-      auth1_response[auth1_length - 1] != 0xAF) {
-    return 0;
-  }
-
-  const uint8_t blocklength = 16;
-  uint8_t RndA[16] = {0};
-  uint8_t RndB[16] = {0};
-  uint8_t RndBEnc[16] = {0};
-  uint8_t RndBRotl[16] = {0};
-  uint8_t answer[32] = {0};
-  uint8_t answer_enc[32] = {0};
-  memcpy(RndBEnc, auth1_response, blocklength);
-  if (!ntag424_decrypt(key, blocklength, RndBEnc, RndB)) {
-    return 0;
-  }
-
-  ntag424_rotl(RndB, RndBRotl, blocklength, 1);
-  ntag424_random(RndA, blocklength);
-  memcpy(answer, RndA, blocklength);
-  memcpy(answer + blocklength, RndBRotl, blocklength);
-  ntag424_encrypt(key, sizeof(answer), answer, answer_enc);
-
-  // ISO NEXT FRAME: CLA=0x00, INS=0xAF
-  uint8_t auth2[38] = {0x00, 0xAF, 0x00, 0x00, 0x20};
-  memcpy(auth2 + 5, answer_enc, sizeof(answer_enc));
-  auth2[37] = 0x00;
-  uint8_t auth2_response_enc[NTAG424_AUTHRESPONSE_ENC_SIZE] = {0};
-  uint8_t auth2_frame[40] = {0};
-  const uint8_t auth2_length =
-      reader->transceive(auth2, sizeof(auth2), auth2_frame, sizeof(auth2_frame));
-
-#ifdef NTAG424DEBUG
-  Serial.print("[ISO-AUTH2] resp len=");
-  Serial.print(auth2_length);
-  Serial.print(" hex=");
-  for (uint8_t i = 0; i < auth2_length && i < 36; ++i) {
-    if (auth2_frame[i] < 0x10) Serial.print('0');
-    Serial.print(auth2_frame[i], HEX);
-    Serial.print(' ');
-  }
-  Serial.println();
-#endif
-
-  if (auth2_length < 34 ||
-      auth2_frame[auth2_length - 2] != 0x91 ||
-      auth2_frame[auth2_length - 1] != 0x00) {
-    return 0;
-  }
-
-  uint8_t auth2_response[NTAG424_AUTHRESPONSE_ENC_SIZE] = {0};
-  memcpy(auth2_response_enc, auth2_frame, sizeof(auth2_response_enc));
-  if (!ntag424_decrypt(key, NTAG424_AUTHRESPONSE_ENC_SIZE, auth2_response_enc,
-                       auth2_response)) {
-    return 0;
-  }
-
-  memcpy(session->TI, auth2_response + NTAG424_AUTHRESPONSE_TI_OFFSET,
-         NTAG424_AUTHRESPONSE_TI_SIZE);
-  memcpy(session->RndA, RndA, sizeof(session->RndA));
-  memcpy(session->PDCAP2, auth2_response + NTAG424_AUTHRESPONSE_PDCAP2_OFFSET,
-         sizeof(session->PDCAP2));
-  memcpy(session->PCDCAP2,
-         auth2_response + NTAG424_AUTHRESPONSE_PCDCAP2_OFFSET,
-         sizeof(session->PCDCAP2));
-  session->cmd_counter = 0;
-  session->authenticated = true;
-  ntag424_derive_session_keys(session, key, RndA, RndB);
-  return 1;
-}
-
-uint8_t ntag424_GetFileSettings(NTAG424_Reader *reader,
-                                ntag424_SessionType *session,
-                                uint8_t fileno, uint8_t *buffer,
-                                uint8_t comm_mode) {
-  uint8_t result[64] = {0};
-  const uint8_t cmd_header[1] = {fileno};
-  const uint8_t result_length =
-      ntag424_send_apdu(reader, session, NTAG424_COM_CLA,
-                        NTAG424_CMD_GETFILESETTINGS, 0x00, 0x00, cmd_header,
-                        sizeof(cmd_header), nullptr, 0, 0, comm_mode, result,
-                        sizeof(result));
-  if (result_length > 0 && buffer != nullptr) {
-    memcpy(buffer, result, result_length);
-  }
-  return result_length;
 }
 
 uint8_t ntag424_ChangeFileSettings(NTAG424_Reader *reader,
@@ -551,58 +384,31 @@ bool ntag424_FormatNDEF(NTAG424_Reader *reader) {
     return false;
   }
 
-  uint8_t ndefdata[kIsoUpdateBinaryChunkSize] = {0};
-  const uint8_t cmd_header[1] = {0x00};
-  uint8_t result[12] = {0};
-  bool ret = true;
   const uint8_t memsize = 248;
-  uint8_t offset = 0;
-  uint8_t datalen = kIsoUpdateBinaryChunkSize;
-  while (offset < memsize) {
-    if ((offset + datalen) > memsize) {
-      datalen = memsize - offset;
+  const uint8_t chunk = 47;
+  uint8_t zeros[47] = {0};
+  bool ret = true;
+  for (uint8_t offset = 0; offset < memsize; offset += chunk) {
+    uint8_t len = chunk;
+    if (offset + len > memsize) {
+      len = memsize - offset;
     }
-
-    const uint8_t bytesread =
-        ntag424_send_apdu(reader, nullptr, NTAG424_COM_ISOCLA,
-                          NTAG424_CMD_ISOUPDATEBINARY, 0x00, offset, cmd_header,
-                          0, ndefdata, datalen, 0, NTAG424_COMM_MODE_PLAIN,
-                          result, sizeof(result));
-    if (!ntag424_plain_command_succeeded(result, bytesread)) {
+    uint8_t cmd_header[7] = {2,
+                             static_cast<uint8_t>(offset & 0xFF),
+                             static_cast<uint8_t>((offset >> 8) & 0xFF),
+                             static_cast<uint8_t>((offset >> 16) & 0xFF),
+                             len, 0, 0};
+    uint8_t result[kNtag424MaxApduSize] = {0};
+    const uint8_t rl = ntag424_send_apdu(
+        reader, nullptr, NTAG424_COM_CLA, NTAG424_CMD_WRITEDATA,
+        0x00, 0x00, cmd_header, sizeof(cmd_header),
+        zeros, len, 0x00, NTAG424_COMM_MODE_PLAIN,
+        result, sizeof(result));
+    if (!ntag424_status_ok(result, rl, 0x91, 0x00)) {
       ret = false;
     }
-    offset += datalen;
   }
   return ret;
-}
-
-bool ntag424_ISOUpdateBinary(NTAG424_Reader *reader, uint8_t *data_to_write,
-                             uint8_t length) {
-  if (reader == nullptr || data_to_write == nullptr) {
-    return false;
-  }
-
-  const uint8_t cmd_header[1] = {0x00};
-  uint8_t result[12] = {0};
-  uint8_t offset = 0;
-  uint8_t datalen = kIsoUpdateBinaryChunkSize;
-  for (int i = 0; i < length; i += datalen) {
-    if ((offset + datalen) > length) {
-      datalen = length - offset;
-    }
-    if (datalen > 0) {
-      const uint8_t bytesread = ntag424_send_apdu(
-          reader, nullptr, NTAG424_COM_ISOCLA,
-          NTAG424_CMD_ISOUPDATEBINARY, 0x00, offset, cmd_header, 0,
-          data_to_write + offset, datalen, 0, NTAG424_COMM_MODE_PLAIN, result,
-          sizeof(result));
-      if (!ntag424_plain_command_succeeded(result, bytesread)) {
-        return false;
-      }
-    }
-    offset += datalen;
-  }
-  return true;
 }
 
 bool ntag424_ISOSelectFileById(NTAG424_Reader *reader,

@@ -1739,20 +1739,6 @@ bool Adafruit_PN532::ntag424_FormatNDEF() {
 }
 
 /*!
-    @brief   write data_to_write to picc. (Chip signature).
-
-    @param   data_to_write     buffer containg the data to write
-    @param   length            length of the buffer
-
-    @return  false on fail|true on success
-*/
-/**************************************************************************/
-bool Adafruit_PN532::ntag424_ISOUpdateBinary(uint8_t *data_to_write,
-                                             uint8_t length) {
-  return NTAG424_Handler::ntag424_ISOUpdateBinary(data_to_write, length);
-}
-
-/*!
     @brief   select file by fileid for the following commands.
 
     @param   fileid      fileid

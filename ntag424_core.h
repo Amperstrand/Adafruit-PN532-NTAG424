@@ -25,7 +25,6 @@
 #define NTAG424_COM_ISOCLA (0x00)
 #define NTAG424_CMD_ISOSELECTFILE (0xA4)
 #define NTAG424_CMD_ISOREADBINARY (0xB0)
-#define NTAG424_CMD_ISOUPDATEBINARY (0xD6)
 
 #define NTAG424_AUTHRESPONSE_ENC_SIZE 32
 #define NTAG424_AUTHRESPONSE_RNDA_SIZE 16
@@ -83,9 +82,6 @@ struct ntag424_FileSettings {
 uint8_t ntag424_Authenticate(NTAG424_Reader *reader,
                              ntag424_SessionType *session, uint8_t *key,
                              uint8_t keyno, uint8_t cmd);
-uint8_t ntag424_ISOAuthenticate(NTAG424_Reader *reader,
-                                ntag424_SessionType *session, uint8_t *key,
-                                uint8_t keyno);
 uint8_t ntag424_GetFileSettings(NTAG424_Reader *reader,
                                  ntag424_SessionType *session,
                                  uint8_t fileno, uint8_t *buffer,
@@ -116,8 +112,6 @@ uint8_t ntag424_isNTAG424(NTAG424_Reader *reader,
 uint8_t ntag424_GetVersion(NTAG424_Reader *reader,
                            ntag424_VersionInfoType *version_info);
 bool ntag424_FormatNDEF(NTAG424_Reader *reader);
-bool ntag424_ISOUpdateBinary(NTAG424_Reader *reader, uint8_t *data_to_write,
-                             uint8_t length);
 bool ntag424_ISOSelectFileById(NTAG424_Reader *reader,
                                ntag424_SessionType *session, int fileid);
 bool ntag424_ISOSelectFileByDFN(NTAG424_Reader *reader,

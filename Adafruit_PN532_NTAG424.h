@@ -371,7 +371,6 @@ public:
   uint8_t ntag424_ISOReadBinary(uint16_t offset, uint8_t le, uint8_t *response,
                                 uint16_t response_bufsize);
   bool ntag424_FormatNDEF();
-  bool ntag424_ISOUpdateBinary(uint8_t *buffer, uint8_t length);
   bool ntag424_ISOSelectFileById(int fileid);
   bool ntag424_ISOSelectFileByDFN(uint8_t *dfn);
   uint8_t ntag424_isNTAG424();
