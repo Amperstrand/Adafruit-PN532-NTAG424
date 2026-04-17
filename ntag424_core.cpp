@@ -393,8 +393,13 @@ bool ntag424_FormatNDEF(NTAG424_Reader *reader) {
     }
 
     const uint8_t bytesread =
+        // Obsttube/MFRC522_NTAG424DNA uses short-EF addressing (P1=0x84)
+        // for the NDEF file (file number 2, P1 = 0x82 + 0x02 = 0x84).
+        // This makes each UPDATE BINARY self-contained and does not depend
+        // on a prior ISO SELECT FILE setting the current EF — critical for
+        // MFRC522 which may lose selected-EF state between commands.
         ntag424_send_apdu(reader, nullptr, NTAG424_COM_ISOCLA,
-                          NTAG424_CMD_ISOUPDATEBINARY, 0x00, offset, cmd_header,
+                          NTAG424_CMD_ISOUPDATEBINARY, 0x84, offset, cmd_header,
                           0, ndefdata, datalen, 0, NTAG424_COMM_MODE_PLAIN,
                           result, sizeof(result));
     if (!ntag424_plain_command_succeeded(result, bytesread)) {
@@ -422,7 +427,7 @@ bool ntag424_ISOUpdateBinary(NTAG424_Reader *reader, uint8_t *data_to_write,
     if (datalen > 0) {
       const uint8_t bytesread = ntag424_send_apdu(
           reader, nullptr, NTAG424_COM_ISOCLA,
-          NTAG424_CMD_ISOUPDATEBINARY, 0x00, offset, cmd_header, 0,
+          NTAG424_CMD_ISOUPDATEBINARY, 0x84, offset, cmd_header, 0,
           data_to_write + offset, datalen, 0, NTAG424_COMM_MODE_PLAIN, result,
           sizeof(result));
       if (!ntag424_plain_command_succeeded(result, bytesread)) {
