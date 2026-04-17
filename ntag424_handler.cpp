@@ -135,6 +135,11 @@ uint8_t NTAG424_Handler::ntag424_ReadData(uint8_t *buffer, int fileno,
   return ::ntag424_ReadData(_ntag424_reader, buffer, fileno, offset, size);
 }
 
+bool NTAG424_Handler::ntag424_WriteData(uint8_t fileno, uint8_t *data,
+                                        uint8_t length) {
+  return ::ntag424_WriteData(_ntag424_reader, fileno, data, length);
+}
+
 uint8_t NTAG424_Handler::ntag424_Authenticate(uint8_t *key, uint8_t keyno,
                                               uint8_t cmd) {
   return ::ntag424_Authenticate(_ntag424_reader, &ntag424_Session, key, keyno,

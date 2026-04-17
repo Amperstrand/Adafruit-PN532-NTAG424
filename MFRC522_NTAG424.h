@@ -52,6 +52,7 @@ public:
   uint8_t ntag424_rotl(uint8_t *input, uint8_t *output, uint8_t bufferlen,
                        uint8_t rotation);
   uint8_t ntag424_ReadData(uint8_t *buffer, int fileno, int offset, int size);
+  bool ntag424_WriteData(uint8_t fileno, uint8_t *data, uint8_t length);
   uint8_t ntag424_Authenticate(uint8_t *key, uint8_t keyno, uint8_t cmd);
   uint8_t ntag424_ISOAuthenticate(uint8_t *key, uint8_t keyno);
   uint8_t ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,

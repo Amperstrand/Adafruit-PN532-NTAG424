@@ -158,6 +158,11 @@ uint8_t MFRC522_NTAG424::ntag424_ReadData(uint8_t *buffer, int fileno,
   return NTAG424_Handler::ntag424_ReadData(buffer, fileno, offset, size);
 }
 
+bool MFRC522_NTAG424::ntag424_WriteData(uint8_t fileno, uint8_t *data,
+                                        uint8_t length) {
+  return NTAG424_Handler::ntag424_WriteData(fileno, data, length);
+}
+
 uint8_t MFRC522_NTAG424::ntag424_Authenticate(uint8_t *key, uint8_t keyno,
                                                 uint8_t cmd) {
   return NTAG424_Handler::ntag424_Authenticate(key, keyno, cmd);

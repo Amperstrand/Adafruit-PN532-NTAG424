@@ -16,6 +16,7 @@
 #define NTAG424_CMD_CHANGEFILESETTINGS (0x5F)
 #define NTAG424_CMD_GETCARDUUID (0x51)
 #define NTAG424_CMD_READDATA (0xAD)
+#define NTAG424_CMD_WRITEDATA (0x8D)
 #define NTAG424_CMD_GETVERSION (0x60)
 #define NTAG424_CMD_NEXTFRAME (0xAF)
 
@@ -107,6 +108,8 @@ uint8_t ntag424_ReadSig(NTAG424_Reader *reader, ntag424_SessionType *session,
                         uint8_t *buffer);
 uint8_t ntag424_ReadData(NTAG424_Reader *reader, uint8_t *buffer, int fileno,
                          int offset, int size);
+bool ntag424_WriteData(NTAG424_Reader *reader, uint8_t fileno,
+                       uint8_t *data, uint8_t length);
 uint8_t ntag424_isNTAG424(NTAG424_Reader *reader,
                           ntag424_SessionType *session,
                           ntag424_VersionInfoType *version_info);
