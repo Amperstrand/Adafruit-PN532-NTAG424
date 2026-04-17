@@ -450,39 +450,21 @@ uint8_t ntag424_ReadData(NTAG424_Reader *reader, uint8_t *buffer, int fileno,
   return data_length;
 }
 
-bool ntag424_WriteData(NTAG424_Reader *reader, uint8_t fileno,
-                       uint8_t *data, uint8_t length) {
+bool ntag424_WriteData(NTAG424_Reader *reader, ntag424_SessionType *session,
+                       uint8_t fileno, uint8_t *data, uint8_t length) {
   if (reader == nullptr || data == nullptr || length == 0) {
     return false;
   }
 
   // Native WriteData: CLA=0x90, INS=0x8D (NTAG424 DNA §7.6.5)
-  const uint8_t apdu_len = 13 + length;
-  if (apdu_len > kNtag424MaxApduSize) {
-    return false;
-  }
-
-  uint8_t apdu[kNtag424MaxApduSize] = {0};
-  apdu[0] = NTAG424_COM_CLA;
-  apdu[1] = NTAG424_CMD_WRITEDATA;
-  apdu[2] = 0x00;
-  apdu[3] = 0x00;
-  apdu[4] = 7 + length;
-  apdu[5] = fileno;
-  apdu[6] = 0x00;
-  apdu[7] = 0x00;
-  apdu[8] = 0x00;
-  apdu[9] = length;
-  apdu[10] = 0x00;
-  apdu[11] = 0x00;
-  memcpy(&apdu[12], data, length);
-  apdu[12 + length] = 0x00;
-
-  uint8_t response[kNtag424MaxApduSize] = {0};
-  const uint8_t response_length =
-      reader->transceive(apdu, apdu_len, response, sizeof(response));
-
-  return ntag424_status_ok(response, response_length, 0x91, 0x00);
+  uint8_t cmd_header[7] = {fileno, 0x00, 0x00, 0x00, length, 0x00, 0x00};
+  uint8_t result[kNtag424MaxApduSize] = {0};
+  const uint8_t result_len = ntag424_send_apdu(
+      reader, session, NTAG424_COM_CLA, NTAG424_CMD_WRITEDATA,
+      0x00, 0x00, cmd_header, sizeof(cmd_header),
+      data, length, 0x00, NTAG424_COMM_MODE_PLAIN,
+      result, sizeof(result));
+  return ntag424_status_ok(result, result_len, 0x91, 0x00);
 }
 
 uint8_t ntag424_isNTAG424(NTAG424_Reader *reader,
