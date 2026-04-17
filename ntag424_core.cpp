@@ -189,6 +189,23 @@ uint8_t ntag424_ChangeFileSettings(NTAG424_Reader *reader,
                            sizeof(result));
 }
 
+uint8_t ntag424_GetFileSettings(NTAG424_Reader *reader,
+                                ntag424_SessionType *session,
+                                uint8_t fileno, uint8_t *buffer,
+                                uint8_t comm_mode) {
+  uint8_t result[64] = {0};
+  const uint8_t cmd_header[1] = {fileno};
+  const uint8_t result_length =
+      ntag424_send_apdu(reader, session, NTAG424_COM_CLA,
+                        NTAG424_CMD_GETFILESETTINGS, 0x00, 0x00, cmd_header,
+                        sizeof(cmd_header), nullptr, 0, 0, comm_mode, result,
+                        sizeof(result));
+  if (result_length > 0 && buffer != nullptr) {
+    memcpy(buffer, result, result_length);
+  }
+  return result_length;
+}
+
 uint8_t ntag424_ChangeKey(NTAG424_Reader *reader, ntag424_SessionType *session,
                           uint8_t *oldkey, uint8_t *newkey, uint8_t keynumber,
                           uint8_t keyversion) {
