@@ -1,0 +1,22 @@
+=== AES-128-CBC Encrypt/Decrypt Round-Trip Verification ===
+
+Test Vector: NIST SP 800-38A F.2.1
+Key:        2b7e1516 28aed2a6 abf71588 09cf4f3c
+IV:         00010203 04050607 08090a0b 0c0d0e0f
+Plaintext:  6bc1bee2 2e409f96 e93d7e11 7393172a
+Ciphertext: 7649abac 8119b246 cee98e9b 12e9197d
+
+Encrypt result: MATCH (0x7649abac8119b246cee98e9b12e9197d)
+Decrypt result: MATCH (0x6bc1bee22e409f96e93d7e117393172a)
+
+2-block round-trip (zero IV):
+Key:        00010203 04050607 08090a0b 0c0d0e0f
+Plaintext:  41424344 45464748 494a4b4c 4d4e4f50 51525354 55565758 595a5b5c 5d5e5f60
+Result:     decrypted == plaintext (MATCH)
+
+CMAC Round-Trip (RFC 4493 Example 1):
+Key:        2b7e1516 28aed2a6 abf71588 09cf4f3c
+Input:      (empty, 0 bytes)
+Full CMAC:  bb1d6929 e9593728 7fa37d12 9b756746
+CMAC Short: 1d295928 a3127546
+Result:     MATCH

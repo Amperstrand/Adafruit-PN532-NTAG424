@@ -55,3 +55,20 @@
 - Every NTAG424 method body in `Adafruit_PN532_NTAG424.cpp` is now a thin wrapper that delegates to `::ntag424_*` free functions or uses `_ntag424_adapter.transceive()` + `ntag424_build_apdu()` + `ntag424_process_response()` for `ntag424_apdu_send()`.
 - All four constructors now initialize `_ntag424_adapter(this)` in their member initializer lists, while non-NTAG424 regions before line 1342 and after line 3523 remain untouched.
 - Desktop crypto tests required an internal non-Arduino CRC32 fallback in `ntag424_crypto.cpp` so the host build no longer depends on linking zlib for that target.
+
+## T9 Regression Verification (2026-04-16)
+
+### Results Summary
+- **Tests**: 3/3 suites PASS (32 tests total: 1 changekey + 10 crypto + 21 apdu)
+- **PN532 Coupling**: 0 references in crypto/apdu/core — clean separation
+- **Circular Includes**: None detected. Dependency DAG: reader -> crypto -> apdu -> core
+- **Source Files**: All 12 files present in project root (flat layout confirmed)
+- **API Count**: 43/44 (1 below baseline — investigate if intentional or a rename drop)
+
+### API Count Note
+The grep for `ntag424_` in `Adafruit_PN532_NTAG424.h` returned 43 vs baseline 44.
+Possible causes: a function was removed, renamed (no longer starts with `ntag424_` prefix),
+or the baseline count included a duplicate/comment line. Flagged for orchestrator review.
+
+### LSP Diagnostics
+Arduino.h not found errors on desktop are EXPECTED (per task context). Ignored.

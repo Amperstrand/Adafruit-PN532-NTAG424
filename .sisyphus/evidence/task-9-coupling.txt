@@ -1,0 +1,11 @@
+=== T9: PN532 Coupling Check ===
+Date: 2026-04-16
+
+Command: grep -c 'Adafruit_PN532|pn532' <file>
+
+ntag424_crypto.cpp: 0 matches  PASS (reader-agnostic)
+ntag424_apdu.cpp:   0 matches  PASS (reader-agnostic)
+ntag424_core.cpp:   0 matches  PASS (reader-agnostic)
+
+All 3 core modules have ZERO PN532 coupling.
+=== RESULT: PASS ===

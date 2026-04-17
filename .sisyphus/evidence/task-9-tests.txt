@@ -1,0 +1,50 @@
+=== T9: Full Regression Test Results ===
+Date: 2026-04-16
+
+--- Test 1: changekey_helpers ---
+BUILD: OK
+RUN:   PASS: ChangeKey helper behavior matches expected protocol
+RESULT: PASS
+
+--- Test 2: crypto ---
+BUILD: OK
+RUN:   PASS: rotl
+       PASS: rotl full cycle
+       PASS: rotl overflow rejection
+       PASS: addpadding
+       PASS: addpadding aligned input
+       PASS: AES-128-CBC encrypt/decrypt round-trip
+       PASS: CMAC empty input (RFC 4493)
+       PASS: cmac_short empty input
+       PASS: CRC32 deterministic (0xB63CFBCD)
+       PASS: AES-128-CBC 2-block round-trip (zero IV)
+       PASS: all 10 ntag424_crypto tests passed
+RESULT: PASS
+
+--- Test 3: apdu ---
+BUILD: OK
+RUN:   PASS: response_has_status success
+       PASS: response_has_status wrong status rejected
+       PASS: response_has_status too short rejected
+       PASS: response_has_status null rejected
+       PASS: plain_command_succeeded success
+       PASS: plain_command_succeeded failure
+       PASS: copy_response_data_if_status with data
+       PASS: copy_response_data_if_status wrong status
+       PASS: copy_response_data_if_status status only
+       PASS: plain_status_ok
+       PASS: build_apdu PLAIN no data
+       PASS: build_apdu PLAIN with data
+       PASS: build_apdu ISO SELECT
+       PASS: build_apdu null output
+       PASS: build_apdu MAC without session
+       PASS: build_apdu FULL without session
+       PASS: process_response PLAIN pass-through
+       PASS: process_response null inputs
+       PASS: iso_select_file with mock reader
+       PASS: iso_select_file failure response
+       PASS: iso_select_file null reader
+       PASS: all 21 ntag424_apdu tests passed
+RESULT: PASS
+
+=== SUMMARY: 3/3 test suites PASS (32 total tests) ===

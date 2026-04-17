@@ -204,6 +204,127 @@ uint8_t ntag424_Authenticate(NTAG424_Reader *reader,
   return 1;
 }
 
+uint8_t ntag424_ISOAuthenticate(NTAG424_Reader *reader,
+                                ntag424_SessionType *session, uint8_t *key,
+                                uint8_t keyno) {
+  if (reader == nullptr || session == nullptr || key == nullptr) {
+    return 0;
+  }
+
+  const uint8_t select_file[] = {NTAG424_COM_ISOCLA,
+                                 NTAG424_CMD_ISOSELECTFILE,
+                                 0x04,
+                                 0x00,
+                                 0x07,
+                                 0xD2,
+                                 0x76,
+                                 0x00,
+                                 0x00,
+                                 0x85,
+                                 0x01,
+                                 0x01,
+                                 0x00};
+  uint8_t select_response[16] = {0};
+  const uint8_t select_length = reader->transceive(
+      select_file, sizeof(select_file), select_response, sizeof(select_response));
+  if (!ntag424_status_ok(select_response, select_length, 0x90, 0x00)) {
+    return 0;
+  }
+
+  // ISO GENERAL AUTHENTICATE: CLA=0x00, INS=0x86
+  const uint8_t auth1[] = {0x00, 0x86, 0x00, 0x00,
+                           0x05, keyno, 0x03, 0x00,
+                           0x00, 0x00, 0x00};
+  uint8_t auth1_response[32] = {0};
+  const uint8_t auth1_length =
+      reader->transceive(auth1, sizeof(auth1), auth1_response,
+                         sizeof(auth1_response));
+
+#ifdef NTAG424DEBUG
+  Serial.print("[ISO-AUTH1] resp len=");
+  Serial.print(auth1_length);
+  Serial.print(" hex=");
+  for (uint8_t i = 0; i < auth1_length && i < 20; ++i) {
+    if (auth1_response[i] < 0x10) Serial.print('0');
+    Serial.print(auth1_response[i], HEX);
+    Serial.print(' ');
+  }
+  Serial.println();
+#endif
+
+  // NTAG424 ISO auth uses same 91 AF status (tested empirically)
+  if (auth1_length < 18 ||
+      auth1_response[auth1_length - 2] != 0x91 ||
+      auth1_response[auth1_length - 1] != 0xAF) {
+    return 0;
+  }
+
+  const uint8_t blocklength = 16;
+  uint8_t RndA[16] = {0};
+  uint8_t RndB[16] = {0};
+  uint8_t RndBEnc[16] = {0};
+  uint8_t RndBRotl[16] = {0};
+  uint8_t answer[32] = {0};
+  uint8_t answer_enc[32] = {0};
+  memcpy(RndBEnc, auth1_response, blocklength);
+  if (!ntag424_decrypt(key, blocklength, RndBEnc, RndB)) {
+    return 0;
+  }
+
+  ntag424_rotl(RndB, RndBRotl, blocklength, 1);
+  ntag424_random(RndA, blocklength);
+  memcpy(answer, RndA, blocklength);
+  memcpy(answer + blocklength, RndBRotl, blocklength);
+  ntag424_encrypt(key, sizeof(answer), answer, answer_enc);
+
+  // ISO NEXT FRAME: CLA=0x00, INS=0xAF
+  uint8_t auth2[38] = {0x00, 0xAF, 0x00, 0x00, 0x20};
+  memcpy(auth2 + 5, answer_enc, sizeof(answer_enc));
+  auth2[37] = 0x00;
+  uint8_t auth2_response_enc[NTAG424_AUTHRESPONSE_ENC_SIZE] = {0};
+  uint8_t auth2_frame[40] = {0};
+  const uint8_t auth2_length =
+      reader->transceive(auth2, sizeof(auth2), auth2_frame, sizeof(auth2_frame));
+
+#ifdef NTAG424DEBUG
+  Serial.print("[ISO-AUTH2] resp len=");
+  Serial.print(auth2_length);
+  Serial.print(" hex=");
+  for (uint8_t i = 0; i < auth2_length && i < 36; ++i) {
+    if (auth2_frame[i] < 0x10) Serial.print('0');
+    Serial.print(auth2_frame[i], HEX);
+    Serial.print(' ');
+  }
+  Serial.println();
+#endif
+
+  if (auth2_length < 34 ||
+      auth2_frame[auth2_length - 2] != 0x91 ||
+      auth2_frame[auth2_length - 1] != 0x00) {
+    return 0;
+  }
+
+  uint8_t auth2_response[NTAG424_AUTHRESPONSE_ENC_SIZE] = {0};
+  memcpy(auth2_response_enc, auth2_frame, sizeof(auth2_response_enc));
+  if (!ntag424_decrypt(key, NTAG424_AUTHRESPONSE_ENC_SIZE, auth2_response_enc,
+                       auth2_response)) {
+    return 0;
+  }
+
+  memcpy(session->TI, auth2_response + NTAG424_AUTHRESPONSE_TI_OFFSET,
+         NTAG424_AUTHRESPONSE_TI_SIZE);
+  memcpy(session->RndA, RndA, sizeof(session->RndA));
+  memcpy(session->PDCAP2, auth2_response + NTAG424_AUTHRESPONSE_PDCAP2_OFFSET,
+         sizeof(session->PDCAP2));
+  memcpy(session->PCDCAP2,
+         auth2_response + NTAG424_AUTHRESPONSE_PCDCAP2_OFFSET,
+         sizeof(session->PCDCAP2));
+  session->cmd_counter = 0;
+  session->authenticated = true;
+  ntag424_derive_session_keys(session, key, RndA, RndB);
+  return 1;
+}
+
 uint8_t ntag424_GetFileSettings(NTAG424_Reader *reader,
                                 ntag424_SessionType *session,
                                 uint8_t fileno, uint8_t *buffer,

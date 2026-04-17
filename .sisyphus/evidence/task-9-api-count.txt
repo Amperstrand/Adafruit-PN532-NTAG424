@@ -1,0 +1,14 @@
+=== T9: Public API Count ===
+Date: 2026-04-16
+
+Command: grep -c 'ntag424_' Adafruit_PN532_NTAG424.h
+Result: 43
+
+Baseline: 44
+Delta: -1 (1 fewer than baseline)
+
+NOTE: The count is 43, which is 1 below the 44 baseline.
+This may indicate one API entry was removed or renamed during refactoring.
+No code changes were made — this is reported as-is for orchestrator review.
+
+=== RESULT: WARN (43/44, 1 below baseline) ===

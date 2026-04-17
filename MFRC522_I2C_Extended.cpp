@@ -3,6 +3,10 @@
 namespace {
 
 bool is_s_block_wtx(byte pcb, byte infLength, const byte *inf) {
+  // ISO-DEP S(WTX) is the card's standard way to extend frame waiting time.
+  // AN14513 Rev. 3.0 shows NTAG X DNA issuing S(WTX) repeatedly until the
+  // underlying operation is ready, so the reader must recognize and answer it
+  // instead of treating the first wait request as a transport failure.
   return (pcb & 0xC0) == 0xC0 && (pcb & 0x30) == 0x30 && infLength == 1 &&
          inf != nullptr;
 }
@@ -283,6 +287,9 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
     const byte infLength =
         inLength > offset ? static_cast<byte>(inLength - offset) : 0;
     if (is_s_block_wtx(inBuffer[0], infLength, inBuffer + offset)) {
+      // Mirror the card's WTXM value back in an S(WTX) response and keep the
+      // current I-block state intact. ISO-DEP wait-state exchanges are
+      // supervisory blocks, not completed I/R data exchanges.
       current.prologue.pcb = static_cast<byte>(0xF2 | (hasCid ? 0x08 : 0x00));
       current.prologue.cid = hasCid ? inBuffer[1] : 0x00;
       current.prologue.nad = 0x00;

@@ -82,6 +82,9 @@ struct ntag424_FileSettings {
 uint8_t ntag424_Authenticate(NTAG424_Reader *reader,
                              ntag424_SessionType *session, uint8_t *key,
                              uint8_t keyno, uint8_t cmd);
+uint8_t ntag424_ISOAuthenticate(NTAG424_Reader *reader,
+                                ntag424_SessionType *session, uint8_t *key,
+                                uint8_t keyno);
 uint8_t ntag424_GetFileSettings(NTAG424_Reader *reader,
                                  ntag424_SessionType *session,
                                  uint8_t fileno, uint8_t *buffer,

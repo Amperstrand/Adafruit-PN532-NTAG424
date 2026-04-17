@@ -228,6 +228,13 @@ MFRC522_I2C::StatusCode MFRC522_I2C::PCD_CommunicateWithPICC(
     PCD_SetRegisterBitMask(BitFramingReg, 0x80);
   }
 
+  // MFRC522 exposes a programmable timer unit rather than a card-aware ISO-DEP
+  // timeout policy (MFRC522 datasheet Rev. 3.9, Section 8.5 "Timer unit").
+  // NTAG X DNA documentation shows that Type 4 Tag operations may need longer
+  // host-side wait windows while the PICC finishes work and/or emits WTX
+  // requests (AN14513 Rev. 3.0, Section 4.2; AN12196 Rev. 2.0, Section 5.8.1).
+  // Give longer write-like transceive operations more poll budget instead of
+  // timing out at the same short loop used for select/read traffic.
   unsigned int retries =
       (command == PCD_Transceive && sendLen > 16) ? kWritePcdPollRetries
                                                  : kDefaultPcdPollRetries;

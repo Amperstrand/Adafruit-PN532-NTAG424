@@ -1,0 +1,3 @@
+class PN532_NTAG424_Adapter : public NTAG424_Reader {
+3
+  pn532_frame[0] = PN532_COMMAND_INDATAEXCHANGE;

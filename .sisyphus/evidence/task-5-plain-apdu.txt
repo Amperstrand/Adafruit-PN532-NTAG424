@@ -1,0 +1,23 @@
+PASS: response_has_status success
+PASS: response_has_status wrong status rejected
+PASS: response_has_status too short rejected
+PASS: response_has_status null rejected
+PASS: plain_command_succeeded success
+PASS: plain_command_succeeded failure
+PASS: copy_response_data_if_status with data
+PASS: copy_response_data_if_status wrong status
+PASS: copy_response_data_if_status status only
+PASS: plain_status_ok
+PASS: build_apdu PLAIN no data
+PASS: build_apdu PLAIN with data
+PASS: build_apdu ISO SELECT
+PASS: build_apdu null output
+PASS: build_apdu MAC without session
+PASS: build_apdu FULL without session
+PASS: process_response PLAIN pass-through
+PASS: process_response null inputs
+PASS: iso_select_file with mock reader
+PASS: iso_select_file failure response
+PASS: iso_select_file null reader
+
+PASS: all 21 ntag424_apdu tests passed

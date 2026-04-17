@@ -159,9 +159,14 @@ uint8_t MFRC522_NTAG424::ntag424_ReadData(uint8_t *buffer, int fileno,
 }
 
 uint8_t MFRC522_NTAG424::ntag424_Authenticate(uint8_t *key, uint8_t keyno,
-                                               uint8_t cmd) {
+                                                uint8_t cmd) {
   return NTAG424_Handler::ntag424_Authenticate(key, keyno, cmd);
 }
+
+uint8_t MFRC522_NTAG424::ntag424_ISOAuthenticate(uint8_t *key, uint8_t keyno) {
+  return NTAG424_Handler::ntag424_ISOAuthenticate(key, keyno);
+}
+
 
 uint8_t MFRC522_NTAG424::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
                                             uint8_t keynumber,

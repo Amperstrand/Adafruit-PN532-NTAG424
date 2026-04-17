@@ -1,0 +1,33 @@
+=== T9: Include / Circular Dependency Check ===
+Date: 2026-04-16
+
+--- ntag424_reader.h includes ---
+#include <stdint.h>
+VERDICT: PASS - Only standard header. Does NOT include any ntag424_*.h
+
+--- ntag424_crypto.h includes ---
+#include <stdint.h>
+#include <string.h>
+#include "aescmac.h"
+VERDICT: PASS - Standard headers + aescmac helper only. No PN532, no reader.
+
+--- ntag424_apdu.h includes ---
+#include "ntag424_crypto.h"
+#include "ntag424_reader.h"
+VERDICT: PASS - Depends on crypto + reader interface. No PN532.
+
+--- ntag424_core.h includes ---
+#include "ntag424_crypto.h"
+#include "ntag424_apdu.h"
+#include "ntag424_reader.h"
+VERDICT: PASS - Depends on crypto + apdu + reader interface. Does NOT include pn532_ntag424_adapter.h.
+
+--- Circular include analysis ---
+- ntag424_reader.h: only <stdint.h> (no deps on other ntag424 modules) PASS
+- ntag424_core.h: does NOT include pn532_ntag424_adapter.h PASS
+- ntag424_crypto.h: does NOT include pn532*.h PASS
+- ntag424_apdu.h: does NOT include pn532*.h PASS
+- Dependency graph is DAG: reader -> crypto -> apdu -> core (leaf)
+- Adapter (pn532_ntag424_adapter.h) only included in Adafruit_PN532_NTAG424.h (composition root)
+
+=== RESULT: PASS - No circular includes detected ===

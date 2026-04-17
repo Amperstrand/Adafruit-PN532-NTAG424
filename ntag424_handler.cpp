@@ -141,6 +141,11 @@ uint8_t NTAG424_Handler::ntag424_Authenticate(uint8_t *key, uint8_t keyno,
                                 cmd);
 }
 
+uint8_t NTAG424_Handler::ntag424_ISOAuthenticate(uint8_t *key, uint8_t keyno) {
+  return ::ntag424_ISOAuthenticate(_ntag424_reader, &ntag424_Session, key,
+                                   keyno);
+}
+
 uint8_t NTAG424_Handler::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
                                            uint8_t keynumber,
                                            uint8_t keyversion) {
