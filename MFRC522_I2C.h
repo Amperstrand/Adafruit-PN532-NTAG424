@@ -221,6 +221,8 @@ public:
 
 protected:
   static constexpr byte kWireChunkSize = 24;
+  static constexpr unsigned int kDefaultPcdPollRetries = 2000;
+  static constexpr unsigned int kWritePcdPollRetries = 12000;
 
   byte _chipAddress;
   TwoWire *_wire;

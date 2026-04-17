@@ -1,5 +1,14 @@
 #include "MFRC522_I2C_Extended.h"
 
+namespace {
+
+bool is_s_block_wtx(byte pcb, byte infLength, const byte *inf) {
+  return (pcb & 0xC0) == 0xC0 && (pcb & 0x30) == 0x30 && infLength == 1 &&
+         inf != nullptr;
+}
+
+}
+
 MFRC522_I2C::StatusCode MFRC522_I2C_Extended::PICC_Select(Uid *selectedUid,
                                                           byte validBits) {
   if (selectedUid == nullptr) {
@@ -198,96 +207,111 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
     return STATUS_INVALID;
   }
 
-  byte outBuffer[FIFO_SIZE] = {0};
-  byte outLength = 1;
-  outBuffer[0] = send->prologue.pcb;
+  PcbBlock current = *send;
+  for (byte attempt = 0; attempt < 6; ++attempt) {
+    byte outBuffer[FIFO_SIZE] = {0};
+    byte outLength = 1;
+    outBuffer[0] = current.prologue.pcb;
 
-  if ((send->prologue.pcb & 0x08) != 0) {
-    outBuffer[outLength++] = send->prologue.cid;
-  }
-  if ((send->prologue.pcb & 0x04) != 0) {
-    outBuffer[outLength++] = send->prologue.nad;
-  }
-  if (send->inf.size > 0 && send->inf.data != nullptr) {
-    if (static_cast<byte>(outLength + send->inf.size) > FIFO_SIZE) {
-      return STATUS_NO_ROOM;
+    if ((current.prologue.pcb & 0x08) != 0) {
+      outBuffer[outLength++] = current.prologue.cid;
     }
-    memcpy(outBuffer + outLength, send->inf.data, send->inf.size);
-    outLength = static_cast<byte>(outLength + send->inf.size);
+    if ((current.prologue.pcb & 0x04) != 0) {
+      outBuffer[outLength++] = current.prologue.nad;
+    }
+    if (current.inf.size > 0 && current.inf.data != nullptr) {
+      if (static_cast<byte>(outLength + current.inf.size) > FIFO_SIZE) {
+        return STATUS_NO_ROOM;
+      }
+      memcpy(outBuffer + outLength, current.inf.data, current.inf.size);
+      outLength = static_cast<byte>(outLength + current.inf.size);
+    }
+
+    if ((PCD_ReadRegister(TxModeReg) & 0x80) == 0) {
+      if (static_cast<byte>(outLength + 2) > FIFO_SIZE) {
+        return STATUS_NO_ROOM;
+      }
+      const StatusCode crcStatus = PCD_CalculateCRC(outBuffer, outLength,
+                                                    outBuffer + outLength);
+      if (crcStatus != STATUS_OK) {
+        return crcStatus;
+      }
+      outLength = static_cast<byte>(outLength + 2);
+    }
+
+    byte inBuffer[FIFO_SIZE] = {0};
+    byte inLength = sizeof(inBuffer);
+    const StatusCode status =
+        PCD_TransceiveData(outBuffer, outLength, inBuffer, &inLength);
+    if (status != STATUS_OK) {
+      return status;
+    }
+    if (inLength == 0) {
+      return STATUS_ERROR;
+    }
+
+    byte offset = 1;
+    const bool hasCid = (inBuffer[0] & 0x08) != 0;
+    if (hasCid) {
+      ++offset;
+    }
+    if ((inBuffer[0] & 0x04) != 0) {
+      ++offset;
+    }
+
+    if ((PCD_ReadRegister(RxModeReg) & 0x80) == 0) {
+      if (inLength < static_cast<byte>(offset + 2)) {
+        return STATUS_CRC_WRONG;
+      }
+      byte controlBuffer[2] = {0};
+      const StatusCode crcStatus = PCD_CalculateCRC(
+          inBuffer, static_cast<byte>(inLength - 2), controlBuffer);
+      if (crcStatus != STATUS_OK) {
+        return crcStatus;
+      }
+      if (controlBuffer[0] != inBuffer[inLength - 2] ||
+          controlBuffer[1] != inBuffer[inLength - 1]) {
+        return STATUS_CRC_WRONG;
+      }
+      inLength = static_cast<byte>(inLength - 2);
+    }
+
+    if (((inBuffer[0] & 0xC0) == 0x80) && ((inBuffer[0] & 0x20) != 0)) {
+      return STATUS_MIFARE_NACK;
+    }
+
+    const byte infLength =
+        inLength > offset ? static_cast<byte>(inLength - offset) : 0;
+    if (is_s_block_wtx(inBuffer[0], infLength, inBuffer + offset)) {
+      current.prologue.pcb = static_cast<byte>(0xF2 | (hasCid ? 0x08 : 0x00));
+      current.prologue.cid = hasCid ? inBuffer[1] : 0x00;
+      current.prologue.nad = 0x00;
+      current.inf.size = 1;
+      current.inf.data = inBuffer + offset;
+      continue;
+    }
+
+    if (backPcb != nullptr) {
+      *backPcb = inBuffer[0];
+    }
+
+    if (backLen != nullptr) {
+      if (backData == nullptr && infLength != 0) {
+        return STATUS_NO_ROOM;
+      }
+      if (infLength > *backLen) {
+        return STATUS_NO_ROOM;
+      }
+      if (backData != nullptr && infLength > 0) {
+        memcpy(backData, inBuffer + offset, infLength);
+      }
+      *backLen = infLength;
+    }
+
+    return STATUS_OK;
   }
 
-  if ((PCD_ReadRegister(TxModeReg) & 0x80) == 0) {
-    if (static_cast<byte>(outLength + 2) > FIFO_SIZE) {
-      return STATUS_NO_ROOM;
-    }
-    const StatusCode crcStatus = PCD_CalculateCRC(outBuffer, outLength,
-                                                  outBuffer + outLength);
-    if (crcStatus != STATUS_OK) {
-      return crcStatus;
-    }
-    outLength = static_cast<byte>(outLength + 2);
-  }
-
-  byte inBuffer[FIFO_SIZE] = {0};
-  byte inLength = sizeof(inBuffer);
-  const StatusCode status =
-      PCD_TransceiveData(outBuffer, outLength, inBuffer, &inLength);
-  if (status != STATUS_OK) {
-    return status;
-  }
-  if (inLength == 0) {
-    return STATUS_ERROR;
-  }
-
-  if (backPcb != nullptr) {
-    *backPcb = inBuffer[0];
-  }
-
-  byte offset = 1;
-  if ((inBuffer[0] & 0x08) != 0) {
-    ++offset;
-  }
-  if ((inBuffer[0] & 0x04) != 0) {
-    ++offset;
-  }
-
-  if ((PCD_ReadRegister(RxModeReg) & 0x80) == 0) {
-    if (inLength < static_cast<byte>(offset + 2)) {
-      return STATUS_CRC_WRONG;
-    }
-    byte controlBuffer[2] = {0};
-    const StatusCode crcStatus =
-        PCD_CalculateCRC(inBuffer, static_cast<byte>(inLength - 2), controlBuffer);
-    if (crcStatus != STATUS_OK) {
-      return crcStatus;
-    }
-    if (controlBuffer[0] != inBuffer[inLength - 2] ||
-        controlBuffer[1] != inBuffer[inLength - 1]) {
-      return STATUS_CRC_WRONG;
-    }
-    inLength = static_cast<byte>(inLength - 2);
-  }
-
-  if (((inBuffer[0] & 0xC0) == 0x80) && ((inBuffer[0] & 0x20) != 0)) {
-    return STATUS_MIFARE_NACK;
-  }
-
-  const byte infLength =
-      inLength > offset ? static_cast<byte>(inLength - offset) : 0;
-  if (backLen != nullptr) {
-    if (backData == nullptr && infLength != 0) {
-      return STATUS_NO_ROOM;
-    }
-    if (infLength > *backLen) {
-      return STATUS_NO_ROOM;
-    }
-    if (backData != nullptr && infLength > 0) {
-      memcpy(backData, inBuffer + offset, infLength);
-    }
-    *backLen = infLength;
-  }
-
-  return STATUS_OK;
+  return STATUS_TIMEOUT;
 }
 
 MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(

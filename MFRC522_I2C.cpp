@@ -228,7 +228,9 @@ MFRC522_I2C::StatusCode MFRC522_I2C::PCD_CommunicateWithPICC(
     PCD_SetRegisterBitMask(BitFramingReg, 0x80);
   }
 
-  unsigned int retries = 2000;
+  unsigned int retries =
+      (command == PCD_Transceive && sendLen > 16) ? kWritePcdPollRetries
+                                                 : kDefaultPcdPollRetries;
   while (retries-- > 0) {
     const byte irq = PCD_ReadRegister(ComIrqReg);
     if ((irq & waitIRq) != 0) {
