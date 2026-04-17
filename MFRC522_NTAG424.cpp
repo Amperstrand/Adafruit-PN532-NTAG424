@@ -45,7 +45,7 @@ bool MFRC522_NTAG424::begin(int sda, int scl, uint32_t frequency) {
 }
 
 bool MFRC522_NTAG424::readPassiveTargetID(uint8_t *uidBuffer,
-                                          uint8_t *uidLength) {
+                                           uint8_t *uidLength) {
   if (uidLength == nullptr) {
     return false;
   }
@@ -58,6 +58,12 @@ bool MFRC522_NTAG424::readPassiveTargetID(uint8_t *uidBuffer,
     clearTag();
     delay(5);
   }
+
+  // Antenna power-cycle forces halted cards back to IDLE.
+  // TxControlReg bits 0,1 = TX1/TX2 RF drivers (MFRC522 §8.8.2).
+  PCD_WriteRegister(TxControlReg, 0x00);
+  delay(10);
+  PCD_WriteRegister(TxControlReg, 0x03);
 
   if (!PICC_IsNewCardPresent() || !PICC_ReadCardSerial()) {
     *uidLength = 0;
