@@ -123,14 +123,15 @@ int main() {
       return fail("ISOUpdateBinary should send two chunks for 60 bytes");
     }
     if (reader.sent_frames[0][0] != 0x00 || reader.sent_frames[0][1] != 0xD6 ||
-        reader.sent_frames[0][2] != 0x84 || reader.sent_frames[0][3] != 0x00 ||
-        reader.sent_frames[0][4] != 54) {
+        reader.sent_frames[0][2] != 0x00 || reader.sent_frames[0][3] != 0x00 ||
+        reader.sent_frames[0][4] != 25) {
       return fail("ISOUpdateBinary first chunk APDU header mismatch");
     }
-    if (reader.sent_frames[1][3] != 54 || reader.sent_frames[1][4] != 6) {
+    if (reader.sent_frames[1][2] != 0x00 || reader.sent_frames[1][3] != 25 ||
+        reader.sent_frames[1][4] != 25) {
       return fail("ISOUpdateBinary second chunk offset/length mismatch");
     }
-    if (!expect_bytes(reader.sent_frames[1] + 5, data + 54, 6,
+    if (!expect_bytes(reader.sent_frames[1] + 5, data + 25, 25,
                       "ISOUpdateBinary second chunk payload")) {
       return 1;
     }
