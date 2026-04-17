@@ -73,9 +73,15 @@ public:
 
 #if !defined(ARDUINO)
 typedef uint8_t byte;
+
 #ifndef SPI_BITORDER_LSBFIRST
+#ifdef LSBFIRST
+#define SPI_BITORDER_LSBFIRST LSBFIRST
+#else
 #define SPI_BITORDER_LSBFIRST 0
 #endif
+#endif
+
 #ifndef SPI_MODE0
 #define SPI_MODE0 0
 #endif
@@ -83,6 +89,27 @@ typedef uint8_t byte;
 #ifndef HEX
 #define HEX 16
 #endif
+
+#ifndef LOW
+#define LOW 0
+#endif
+
+#ifndef HIGH
+#define HIGH 1
+#endif
+
+#ifndef INPUT
+#define INPUT 0
+#endif
+
+#ifndef OUTPUT
+#define OUTPUT 1
+#endif
+
+#ifndef F
+#define F(x) (x)
+#endif
+
 class SPIClass {};
 class TwoWire {};
 class HardwareSerial {
@@ -98,52 +125,7 @@ public:
   }
   size_t write(const uint8_t *, size_t len) { return len; }
 };
-inline SPIClass SPI;
-inline TwoWire Wire;
 
-#if !__has_include("Arduino.h")
-#ifndef LOW
-#define LOW 0
-#endif
-
-extern SPIClass SPI;
-extern TwoWire Wire;
-
-#ifndef SPI_BITORDER_LSBFIRST
-#ifdef LSBFIRST
-#define SPI_BITORDER_LSBFIRST LSBFIRST
-#else
-#define SPI_BITORDER_LSBFIRST 0
-#endif
-#endif
-
-#ifndef SPI_MODE0
-#define SPI_MODE0 0
-#endif
-
-#ifndef SPI_BITORDER_LSBFIRST
-#ifdef LSBFIRST
-#define SPI_BITORDER_LSBFIRST LSBFIRST
-#else
-#define SPI_BITORDER_LSBFIRST 0
-#endif
-#endif
-
-#ifndef SPI_MODE0
-#define SPI_MODE0 0
-#endif
-#ifndef HIGH
-#define HIGH 1
-#endif
-#ifndef INPUT
-#define INPUT 0
-#endif
-#ifndef OUTPUT
-#define OUTPUT 1
-#endif
-#ifndef F
-#define F(x) (x)
-#endif
 class SerialStub {
 public:
   template <typename T> void print(const T &) {}
@@ -152,12 +134,14 @@ public:
   template <typename T> void println(const T &, int) {}
   void println() {}
 };
+
+inline SPIClass SPI;
+inline TwoWire Wire;
 inline SerialStub Serial;
 inline void delay(unsigned long) {}
 inline void pinMode(uint8_t, uint8_t) {}
 inline void digitalWrite(uint8_t, uint8_t) {}
 inline int digitalRead(uint8_t) { return 0; }
-#endif
 #endif
 
 #define PN532_PREAMBLE (0x00)   ///< Command sequence start, byte 1/3
