@@ -2,6 +2,10 @@
 
 #include <string.h>
 
+#ifdef NTAG424DEBUG
+#include <HardwareSerial.h>
+#endif
+
 namespace {
 
 constexpr uint8_t kNtag424MaxApduSize = 80;
@@ -29,9 +33,38 @@ uint8_t ntag424_send_apdu(NTAG424_Reader *reader, ntag424_SessionType *session,
     return 0;
   }
 
+#ifdef NTAG424DEBUG
+  if (ins == 0xD6) {
+    Serial.print("[APDU-TX] len=");
+    Serial.print(apdu_length);
+    Serial.print(" hex=");
+    for (uint8_t i = 0; i < apdu_length && i < 12; ++i) {
+      if (apdu[i] < 0x10) Serial.print('0');
+      Serial.print(apdu[i], HEX);
+      Serial.print(' ');
+    }
+    Serial.println();
+  }
+#endif
+
   uint8_t response[kNtag424MaxApduSize] = {0};
   const uint8_t response_length =
       reader->transceive(apdu, apdu_length, response, sizeof(response));
+
+#ifdef NTAG424DEBUG
+  if (ins == 0xD6) {
+    Serial.print("[APDU-RX] len=");
+    Serial.print(response_length);
+    Serial.print(" hex=");
+    for (uint8_t i = 0; i < response_length && i < 12; ++i) {
+      if (response[i] < 0x10) Serial.print('0');
+      Serial.print(response[i], HEX);
+      Serial.print(' ');
+    }
+    Serial.println();
+  }
+#endif
+
   if (response_length == 0) {
     return 0;
   }
