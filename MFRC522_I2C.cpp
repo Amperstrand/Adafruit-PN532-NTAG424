@@ -159,10 +159,10 @@ bool MFRC522_I2C::PCD_Init() {
 }
 
 bool MFRC522_I2C::PCD_ConfigureDefaults() {
-  if (!PCD_WriteRegisterChecked(TModeReg, 0x80) ||
+  if (      !PCD_WriteRegisterChecked(TModeReg, 0x80) ||
       !PCD_WriteRegisterChecked(TPrescalerReg, 0xA9) ||
-      !PCD_WriteRegisterChecked(TReloadRegH, 0x03) ||
-      !PCD_WriteRegisterChecked(TReloadRegL, 0xE8) ||
+      !PCD_WriteRegisterChecked(TReloadRegH, 0x0F) ||
+      !PCD_WriteRegisterChecked(TReloadRegL, 0xA0) ||
       !PCD_WriteRegisterChecked(TxASKReg, 0x40) ||
       !PCD_WriteRegisterChecked(ModeReg, 0x3D)) {
     return false;
