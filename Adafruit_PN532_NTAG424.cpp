@@ -186,8 +186,10 @@ bool Adafruit_PN532::begin() {
       return false;
     }
   } else if (ser_dev) {
-    ser_dev->begin(115200);
-    // clear out anything in read buffer
+#ifndef PN532_UART_BAUD
+#define PN532_UART_BAUD 115200
+#endif
+    ser_dev->begin(PN532_UART_BAUD);
     while (ser_dev->available())
       ser_dev->read();
   } else {
@@ -1591,6 +1593,11 @@ uint8_t Adafruit_PN532::ntag424_Authenticate(uint8_t *key, uint8_t keyno,
   return NTAG424_Handler::ntag424_Authenticate(key, keyno, cmd);
 }
 
+uint8_t Adafruit_PN532::ntag424_ISOAuthenticate(uint8_t *key,
+                                                uint8_t keyno) {
+  return NTAG424_Handler::ntag424_ISOAuthenticate(key, keyno);
+}
+
 /*!
     @brief   sends a GetFileSettings-call to the picc, copies result into
    buffer.
@@ -1736,6 +1743,11 @@ uint8_t Adafruit_PN532::ntag424_GetVersion() {
 /**************************************************************************/
 bool Adafruit_PN532::ntag424_FormatNDEF() {
   return NTAG424_Handler::ntag424_FormatNDEF();
+}
+
+bool Adafruit_PN532::ntag424_ISOUpdateBinary(uint8_t *buffer,
+                                             uint8_t length) {
+  return NTAG424_Handler::ntag424_ISOUpdateBinary(buffer, length);
 }
 
 /*!

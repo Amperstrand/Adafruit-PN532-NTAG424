@@ -159,13 +159,18 @@ uint8_t MFRC522_NTAG424::ntag424_ReadData(uint8_t *buffer, int fileno,
 }
 
 bool MFRC522_NTAG424::ntag424_WriteData(uint8_t fileno, uint8_t *data,
-                                        uint8_t length) {
-  return NTAG424_Handler::ntag424_WriteData(fileno, data, length);
+                                        uint8_t length, int offset) {
+  return NTAG424_Handler::ntag424_WriteData(fileno, data, length, offset);
 }
 
 uint8_t MFRC522_NTAG424::ntag424_Authenticate(uint8_t *key, uint8_t keyno,
-                                                uint8_t cmd) {
+                                                 uint8_t cmd) {
   return NTAG424_Handler::ntag424_Authenticate(key, keyno, cmd);
+}
+
+uint8_t MFRC522_NTAG424::ntag424_ISOAuthenticate(uint8_t *key,
+                                                 uint8_t keyno) {
+  return NTAG424_Handler::ntag424_ISOAuthenticate(key, keyno);
 }
 
 uint8_t MFRC522_NTAG424::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
@@ -230,6 +235,11 @@ uint8_t MFRC522_NTAG424::ntag424_ISOReadBinary(uint16_t offset, uint8_t le,
 
 bool MFRC522_NTAG424::ntag424_FormatNDEF() {
   return NTAG424_Handler::ntag424_FormatNDEF();
+}
+
+bool MFRC522_NTAG424::ntag424_ISOUpdateBinary(uint8_t *buffer,
+                                              uint8_t length) {
+  return NTAG424_Handler::ntag424_ISOUpdateBinary(buffer, length);
 }
 
 bool MFRC522_NTAG424::ntag424_ISOSelectFileById(int fileid) {

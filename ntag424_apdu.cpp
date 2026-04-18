@@ -262,7 +262,13 @@ uint8_t ntag424_process_response(const uint8_t *response,
     memcpy(processed_out, response, response_length);
   }
 
-  if (session != nullptr && (comm_mode == kNtag424Mac || comm_mode == kNtag424Full)) {
+  // NTAG424 DNA increments cmd_counter for EVERY command when in
+  // authenticated state, even CommMode.Plain commands. Per NT4H2421Tx
+  // datasheet §9.1.8: "the command counter CmdCtr is still increased...
+  // This allows the PCD and PICC to detect any insertion and/or deletion
+  // of commands sent in CommMode.Plain on any subsequent command that is
+  // sent in CommMode.MAC or CommMode.Full."
+  if (session != nullptr && session->authenticated) {
     session->cmd_counter += 1;
   }
   return processed_length;

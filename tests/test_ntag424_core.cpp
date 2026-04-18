@@ -110,6 +110,7 @@ int main() {
     const uint8_t ok_response[2] = {0x90, 0x00};
     reader.queue_response(ok_response, sizeof(ok_response));
     reader.queue_response(ok_response, sizeof(ok_response));
+    reader.queue_response(ok_response, sizeof(ok_response));
 
     uint8_t data[60] = {0};
     for (uint8_t i = 0; i < sizeof(data); ++i) {
@@ -119,8 +120,8 @@ int main() {
     if (!ntag424_ISOUpdateBinary(&reader, data, sizeof(data))) {
       return fail("ISOUpdateBinary should succeed when all chunks succeed");
     }
-    if (reader.sent_count != 2) {
-      return fail("ISOUpdateBinary should send two chunks for 60 bytes");
+    if (reader.sent_count != 3) {
+      return fail("ISOUpdateBinary should send three chunks for 60 bytes");
     }
     if (reader.sent_frames[0][0] != 0x00 || reader.sent_frames[0][1] != 0xD6 ||
         reader.sent_frames[0][2] != 0x00 || reader.sent_frames[0][3] != 0x00 ||
@@ -132,10 +133,54 @@ int main() {
       return fail("ISOUpdateBinary second chunk offset/length mismatch");
     }
     if (!expect_bytes(reader.sent_frames[1] + 5, data + 25, 25,
-                      "ISOUpdateBinary second chunk payload")) {
+                       "ISOUpdateBinary second chunk payload")) {
+      return 1;
+    }
+    if (reader.sent_frames[2][2] != 0x00 || reader.sent_frames[2][3] != 50 ||
+        reader.sent_frames[2][4] != 10) {
+      return fail("ISOUpdateBinary third chunk offset/length mismatch");
+    }
+    if (!expect_bytes(reader.sent_frames[2] + 5, data + 50, 10,
+                      "ISOUpdateBinary third chunk payload")) {
       return 1;
     }
     std::puts("PASS: ISOUpdateBinary chunks and succeeds");
+    passed++;
+  }
+
+  {
+    QueueReader reader;
+    ntag424_SessionType session = {};
+    uint8_t key[16] = {0};
+    if (ntag424_ISOAuthenticate(&reader, &session, key, 0) != 0) {
+      return fail("ISOAuthenticate should fail when select/auth responses are missing");
+    }
+    std::puts("PASS: ISOAuthenticate fails cleanly without responses");
+    passed++;
+  }
+
+  {
+    QueueReader reader;
+    ntag424_SessionType session = {};
+    const uint8_t select_ok[2] = {0x90, 0x00};
+    const uint8_t auth1_fail[2] = {0x91, 0xAE};
+    reader.queue_response(select_ok, sizeof(select_ok));
+    reader.queue_response(auth1_fail, sizeof(auth1_fail));
+
+    uint8_t key[16] = {0};
+    if (ntag424_ISOAuthenticate(&reader, &session, key, 0) != 0) {
+      return fail("ISOAuthenticate should fail on non-91AF auth1 response");
+    }
+    if (reader.sent_count != 2) {
+      return fail("ISOAuthenticate should send select + auth1 before failing");
+    }
+    if (reader.sent_frames[0][0] != 0x00 || reader.sent_frames[0][1] != 0xA4) {
+      return fail("ISOAuthenticate should start with ISO SELECT FILE");
+    }
+    if (reader.sent_frames[1][0] != 0x00 || reader.sent_frames[1][1] != 0x86) {
+      return fail("ISOAuthenticate should send ISO GENERAL AUTHENTICATE");
+    }
+    std::puts("PASS: ISOAuthenticate emits ISO auth APDUs");
     passed++;
   }
 

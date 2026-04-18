@@ -1,5 +1,7 @@
 #include "aescmac.h"
 
+#include <cstring>
+
 // Helper function to XOR two blocks
 void xor_block(uint8_t *output, const uint8_t *input1, const uint8_t *input2,
                size_t len) {

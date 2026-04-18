@@ -1,6 +1,11 @@
 #ifndef TINYCMAC_H
 #define TINYCMAC_H
+#if __has_include("Arduino.h")
 #include "Arduino.h"
+#else
+#include <cstddef>
+#include <cstdint>
+#endif
 #include "mbedtls/aes.h"
 
 void xorBlock(uint8_t *output, const uint8_t *input1, const uint8_t *input2,

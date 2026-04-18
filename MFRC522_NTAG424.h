@@ -52,8 +52,10 @@ public:
   uint8_t ntag424_rotl(uint8_t *input, uint8_t *output, uint8_t bufferlen,
                        uint8_t rotation);
   uint8_t ntag424_ReadData(uint8_t *buffer, int fileno, int offset, int size);
-  bool ntag424_WriteData(uint8_t fileno, uint8_t *data, uint8_t length);
+  bool ntag424_WriteData(uint8_t fileno, uint8_t *data, uint8_t length,
+                        int offset = 0);
   uint8_t ntag424_Authenticate(uint8_t *key, uint8_t keyno, uint8_t cmd);
+  uint8_t ntag424_ISOAuthenticate(uint8_t *key, uint8_t keyno);
   uint8_t ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
                             uint8_t keynumber, uint8_t keyversion = 0x01);
   uint8_t ntag424_ReadSig(uint8_t *buffer);
@@ -72,6 +74,7 @@ public:
   uint8_t ntag424_ISOReadBinary(uint16_t offset, uint8_t le, uint8_t *response,
                                 uint16_t response_bufsize);
   bool ntag424_FormatNDEF();
+  bool ntag424_ISOUpdateBinary(uint8_t *buffer, uint8_t length);
   bool ntag424_ISOSelectFileById(int fileid);
   bool ntag424_ISOSelectFileByDFN(uint8_t *dfn);
   uint8_t ntag424_isNTAG424();
