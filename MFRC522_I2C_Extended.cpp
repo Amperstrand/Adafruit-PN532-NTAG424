@@ -5,8 +5,8 @@ namespace {
 constexpr byte kMaxRetries = 2;
 
 bool is_s_block_wtx(byte pcb, byte infLength, const byte *inf) {
-  return (pcb & 0xC0) == 0xC0 && (pcb & 0x30) == 0x30 && infLength == 1 &&
-         inf != nullptr;
+  return (pcb & PCB_TYPE_MASK) == PCB_TYPE_S && (pcb & PCB_S_WTX) == PCB_S_WTX &&
+         infLength == 1 && inf != nullptr;
 }
 
 }
@@ -33,10 +33,10 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::PICC_Select(Uid *selectedUid,
     if (ppsStatus != STATUS_OK) {
       PCD_WriteRegister(
           TxModeReg,
-          static_cast<byte>(PCD_ReadRegister(TxModeReg) | 0x80));
+          static_cast<byte>(PCD_ReadRegister(TxModeReg) | MFRC522_CRC_ENABLE));
       PCD_WriteRegister(
           RxModeReg,
-          static_cast<byte>(PCD_ReadRegister(RxModeReg) | 0x80));
+          static_cast<byte>(PCD_ReadRegister(RxModeReg) | MFRC522_CRC_ENABLE));
     }
   }
 
@@ -146,9 +146,9 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::PICC_PPS() {
   }
 
   PCD_WriteRegister(TxModeReg,
-                    static_cast<byte>(PCD_ReadRegister(TxModeReg) | 0x80));
+                    static_cast<byte>(PCD_ReadRegister(TxModeReg) | MFRC522_CRC_ENABLE));
   PCD_WriteRegister(RxModeReg,
-                    static_cast<byte>(PCD_ReadRegister(RxModeReg) | 0x80));
+                    static_cast<byte>(PCD_ReadRegister(RxModeReg) | MFRC522_CRC_ENABLE));
   return STATUS_OK;
 }
 
@@ -177,8 +177,8 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::PICC_PPS(
 
   byte txMode = static_cast<byte>(PCD_ReadRegister(TxModeReg) & 0x8F);
   byte rxMode = static_cast<byte>(PCD_ReadRegister(RxModeReg) & 0x8F);
-  txMode = static_cast<byte>(txMode | ((receiveBitRate & 0x03) << 4) | 0x80);
-  rxMode = static_cast<byte>((rxMode | ((sendBitRate & 0x03) << 4) | 0x80) &
+  txMode = static_cast<byte>(txMode | ((receiveBitRate & 0x03) << 4) | MFRC522_CRC_ENABLE);
+  rxMode = static_cast<byte>((rxMode | ((sendBitRate & 0x03) << 4) | MFRC522_CRC_ENABLE) &
                              0xF0);
 
   PCD_WriteRegister(TxModeReg, txMode);
@@ -215,10 +215,10 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
     byte outLength = 1;
     outBuffer[0] = current.prologue.pcb;
 
-    if ((current.prologue.pcb & 0x08) != 0) {
+    if ((current.prologue.pcb & PCB_CID_FOLLOWING) != 0) {
       outBuffer[outLength++] = current.prologue.cid;
     }
-    if ((current.prologue.pcb & 0x04) != 0) {
+    if ((current.prologue.pcb & PCB_NAD_FOLLOWING) != 0) {
       outBuffer[outLength++] = current.prologue.nad;
     }
     if (current.inf.size > 0 && current.inf.data != nullptr) {
@@ -229,7 +229,7 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
       outLength = static_cast<byte>(outLength + current.inf.size);
     }
 
-    if ((PCD_ReadRegister(TxModeReg) & 0x80) == 0) {
+    if ((PCD_ReadRegister(TxModeReg) & MFRC522_CRC_ENABLE) == 0) {
       if (static_cast<byte>(outLength + 2) > FIFO_SIZE) {
         return STATUS_NO_ROOM;
       }
@@ -254,13 +254,13 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
         retries++;
 
         PcbBlock rnak;
-        rnak.prologue.pcb = 0xB2;
-        if ((send->prologue.pcb & 0x08) != 0) {
-          rnak.prologue.pcb |= 0x08;
+        rnak.prologue.pcb = PCB_RNAK;
+        if ((send->prologue.pcb & PCB_CID_FOLLOWING) != 0) {
+          rnak.prologue.pcb |= PCB_CID_FOLLOWING;
           rnak.prologue.cid = send->prologue.cid;
         }
-        if (send->prologue.pcb & 0x01) {
-          rnak.prologue.pcb |= 0x01;
+        if (send->prologue.pcb & PCB_BLOCK_NUMBER) {
+          rnak.prologue.pcb |= PCB_BLOCK_NUMBER;
         }
         rnak.inf.size = 0;
         rnak.inf.data = nullptr;
@@ -268,11 +268,11 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
         byte rnakBuffer[FIFO_SIZE] = {0};
         byte rnakLength = 1;
         rnakBuffer[0] = rnak.prologue.pcb;
-        if ((rnak.prologue.pcb & 0x08) != 0) {
+        if ((rnak.prologue.pcb & PCB_CID_FOLLOWING) != 0) {
           rnakBuffer[rnakLength++] = rnak.prologue.cid;
         }
 
-        if ((PCD_ReadRegister(TxModeReg) & 0x80) == 0) {
+        if ((PCD_ReadRegister(TxModeReg) & MFRC522_CRC_ENABLE) == 0) {
           if (static_cast<byte>(rnakLength + 2) > FIFO_SIZE) {
             return STATUS_NO_ROOM;
           }
@@ -299,15 +299,15 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
     }
 
     byte offset = 1;
-    const bool hasCid = (inBuffer[0] & 0x08) != 0;
+    const bool hasCid = (inBuffer[0] & PCB_CID_FOLLOWING) != 0;
     if (hasCid) {
       ++offset;
     }
-    if ((inBuffer[0] & 0x04) != 0) {
+    if ((inBuffer[0] & PCB_NAD_FOLLOWING) != 0) {
       ++offset;
     }
 
-    if ((PCD_ReadRegister(RxModeReg) & 0x80) == 0) {
+    if ((PCD_ReadRegister(RxModeReg) & MFRC522_CRC_ENABLE) == 0) {
       if (inLength < static_cast<byte>(offset + 2)) {
         return STATUS_CRC_WRONG;
       }
@@ -324,14 +324,14 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
       inLength = static_cast<byte>(inLength - 2);
     }
 
-    if (((inBuffer[0] & 0xC0) == 0x80) && ((inBuffer[0] & 0x20) != 0)) {
+    if (((inBuffer[0] & PCB_TYPE_MASK) == PCB_TYPE_R) && ((inBuffer[0] & PCB_R_NAK) != 0)) {
       return STATUS_MIFARE_NACK;
     }
 
     const byte infLength =
         inLength > offset ? static_cast<byte>(inLength - offset) : 0;
     if (is_s_block_wtx(inBuffer[0], infLength, inBuffer + offset)) {
-      current.prologue.pcb = static_cast<byte>(0xF2 | (hasCid ? 0x08 : 0x00));
+      current.prologue.pcb = static_cast<byte>(PCB_SWTX_RSP | (hasCid ? PCB_CID_FOLLOWING : 0x00));
       current.prologue.cid = hasCid ? inBuffer[1] : 0x00;
       current.prologue.nad = 0x00;
       current.inf.size = 1;
@@ -370,13 +370,13 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
   }
 
   PcbBlock block;
-  block.prologue.pcb = 0x02;
+  block.prologue.pcb = PCB_IBASE;
   if (selectedTag->ats.tc1.supportsCID) {
-    block.prologue.pcb |= 0x08;
+    block.prologue.pcb |= PCB_CID_FOLLOWING;
     block.prologue.cid = 0x00;
   }
   if (selectedTag->blockNumber) {
-    block.prologue.pcb |= 0x01;
+    block.prologue.pcb |= PCB_BLOCK_NUMBER;
   }
   block.inf.size = sendLen;
   block.inf.data = sendData;
@@ -394,7 +394,7 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
   selectedTag->blockNumber = !selectedTag->blockNumber;
   written = backLen != nullptr ? *backLen : 0;
 
-  while ((pcb & 0x10) != 0) {
+  while ((pcb & PCB_CHAINING) != 0) {
     byte remaining = totalLength > written ? static_cast<byte>(totalLength - written)
                                            : 0;
     byte chunkLength = remaining;
@@ -429,13 +429,13 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
     }
 
     PcbBlock ackBlock;
-    ackBlock.prologue.pcb = 0xA2;
+    ackBlock.prologue.pcb = PCB_RACK;
     if (selectedTag->ats.tc1.supportsCID) {
-      ackBlock.prologue.pcb |= 0x08;
+      ackBlock.prologue.pcb |= PCB_CID_FOLLOWING;
       ackBlock.prologue.cid = 0x00;
     }
     if (selectedTag->blockNumber) {
-      ackBlock.prologue.pcb |= 0x01;
+      ackBlock.prologue.pcb |= PCB_BLOCK_NUMBER;
     }
     ackBlock.inf.size = 0;
     ackBlock.inf.data = nullptr;
@@ -459,13 +459,13 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_TransceiveRBlock(
   }
 
   PcbBlock block;
-  block.prologue.pcb = ack ? 0xA2 : 0xB2;
+  block.prologue.pcb = ack ? PCB_RACK : PCB_RNAK;
   if (selectedTag->ats.tc1.supportsCID) {
-    block.prologue.pcb |= 0x08;
+    block.prologue.pcb |= PCB_CID_FOLLOWING;
     block.prologue.cid = 0x00;
   }
   if (selectedTag->blockNumber) {
-    block.prologue.pcb |= 0x01;
+    block.prologue.pcb |= PCB_BLOCK_NUMBER;
   }
   block.inf.size = 0;
   block.inf.data = nullptr;
@@ -478,10 +478,10 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Deselect(TagInfo *selectedTag)
     return STATUS_INVALID;
   }
 
-  byte outBuffer[2] = {0xC2, 0x00};
+  byte outBuffer[2] = {PCB_SDESELECT, 0x00};
   byte outLength = 1;
   if (selectedTag->ats.tc1.supportsCID) {
-    outBuffer[0] |= 0x08;
+    outBuffer[0] |= PCB_CID_FOLLOWING;
     outLength = 2;
   }
 
