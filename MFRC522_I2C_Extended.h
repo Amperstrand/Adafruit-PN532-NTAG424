@@ -43,6 +43,16 @@ public:
     BITRATE_848KBITS = 0x03,
   };
 
+  // ISO 14443-4 activation state machine.
+  // IDLE:       No tag activated (or after deselect).
+  // SELECTED:   PICC_Select succeeded, ATS/PPS done, ready for APDU exchange.
+  // DESELECTED: S(DESELECT) sent, tag deactivated.
+  enum class IsoDepState : byte {
+    IDLE = 0,
+    SELECTED = 1,
+    DESELECTED = 2,
+  };
+
   struct Ats {
     byte size = 0;
     byte fsc = 32;
@@ -70,6 +80,7 @@ public:
     Uid uid = {};
     Ats ats = {};
     bool blockNumber = false;
+    IsoDepState isoDepState = IsoDepState::IDLE;
   };
 
   struct PcbBlock {

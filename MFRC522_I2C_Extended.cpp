@@ -23,6 +23,7 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::PICC_Select(Uid *selectedUid,
   }
 
   tag.uid = *selectedUid;
+  tag.isoDepState = IsoDepState::SELECTED;
   if ((selectedUid->sak & 0x24) == 0x20) {
     const StatusCode atsStatus = PICC_RequestATS(&tag.ats);
     if (atsStatus != STATUS_OK) {
@@ -368,6 +369,9 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
   if (selectedTag == nullptr) {
     return STATUS_INVALID;
   }
+  if (selectedTag->isoDepState != IsoDepState::SELECTED) {
+    return STATUS_INVALID;
+  }
 
   PcbBlock block;
   block.prologue.pcb = PCB_IBASE;
@@ -457,6 +461,9 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_TransceiveRBlock(
   if (selectedTag == nullptr) {
     return STATUS_INVALID;
   }
+  if (selectedTag->isoDepState != IsoDepState::SELECTED) {
+    return STATUS_INVALID;
+  }
 
   PcbBlock block;
   block.prologue.pcb = ack ? PCB_RACK : PCB_RNAK;
@@ -490,6 +497,7 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Deselect(TagInfo *selectedTag)
   const StatusCode status =
       PCD_TransceiveData(outBuffer, outLength, inBuffer, &inLength);
   if (status == STATUS_OK) {
+    selectedTag->isoDepState = IsoDepState::DESELECTED;
     clearTag();
   }
   return status;
@@ -524,6 +532,7 @@ bool MFRC522_I2C_Extended::PICC_ReadCardSerial() {
 void MFRC522_I2C_Extended::clearTag() {
   MFRC522_I2C::clearTag();
   memset(&tag, 0, sizeof(tag));
+  tag.isoDepState = IsoDepState::IDLE;
   tag.ats.fsc = 32;
   tag.ats.ta1.ds = BITRATE_106KBITS;
   tag.ats.ta1.dr = BITRATE_106KBITS;
