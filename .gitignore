@@ -2,3 +2,20 @@
 Doxyfile*
 doxygen_sqlite3.db
 html
+
+# Compiled test binaries (match executable names but not .cpp/.h sources)
+tests/test_apdu
+tests/test_changekey_helpers
+tests/test_core
+tests/test_crypto
+tests/test_mfrc522_public_header
+tests/test_mock_transceiver
+tests/test_public_header
+
+# Proof programs
+tests/proof_random
+tests/proof_setkey
+tests/proof_iv
+
+# Tool state
+.sisyphus/
