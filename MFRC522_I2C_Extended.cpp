@@ -2,11 +2,9 @@
 
 namespace {
 
+constexpr byte kMaxRetries = 2;
+
 bool is_s_block_wtx(byte pcb, byte infLength, const byte *inf) {
-  // ISO-DEP S(WTX) is the card's standard way to extend frame waiting time.
-  // AN14513 Rev. 3.0 shows NTAG X DNA issuing S(WTX) repeatedly until the
-  // underlying operation is ready, so the reader must recognize and answer it
-  // instead of treating the first wait request as a transport failure.
   return (pcb & 0xC0) == 0xC0 && (pcb & 0x30) == 0x30 && infLength == 1 &&
          inf != nullptr;
 }
@@ -245,13 +243,59 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
 
     byte inBuffer[FIFO_SIZE] = {0};
     byte inLength = sizeof(inBuffer);
-    const StatusCode status =
+    StatusCode status =
         PCD_TransceiveData(outBuffer, outLength, inBuffer, &inLength);
+
+    // ISO 14443-4 §7.5.5 error recovery: on transceive failure, send R(NAK)
+    // to request retransmission. Retry up to kMaxRetries times.
     if (status != STATUS_OK) {
-      return status;
-    }
-    if (inLength == 0) {
-      return STATUS_ERROR;
+      byte retries = 0;
+      while (retries < kMaxRetries) {
+        retries++;
+
+        PcbBlock rnak;
+        rnak.prologue.pcb = 0xB2;
+        if ((send->prologue.pcb & 0x08) != 0) {
+          rnak.prologue.pcb |= 0x08;
+          rnak.prologue.cid = send->prologue.cid;
+        }
+        if (send->prologue.pcb & 0x01) {
+          rnak.prologue.pcb |= 0x01;
+        }
+        rnak.inf.size = 0;
+        rnak.inf.data = nullptr;
+
+        byte rnakBuffer[FIFO_SIZE] = {0};
+        byte rnakLength = 1;
+        rnakBuffer[0] = rnak.prologue.pcb;
+        if ((rnak.prologue.pcb & 0x08) != 0) {
+          rnakBuffer[rnakLength++] = rnak.prologue.cid;
+        }
+
+        if ((PCD_ReadRegister(TxModeReg) & 0x80) == 0) {
+          if (static_cast<byte>(rnakLength + 2) > FIFO_SIZE) {
+            return STATUS_NO_ROOM;
+          }
+          const StatusCode crcSt = PCD_CalculateCRC(
+              rnakBuffer, rnakLength, rnakBuffer + rnakLength);
+          if (crcSt != STATUS_OK) {
+            return crcSt;
+          }
+          rnakLength = static_cast<byte>(rnakLength + 2);
+        }
+
+        inLength = sizeof(inBuffer);
+        status = PCD_TransceiveData(rnakBuffer, rnakLength, inBuffer, &inLength);
+        if (status == STATUS_OK && inLength > 0) {
+          break;
+        }
+      }
+      if (status != STATUS_OK) {
+        return status;
+      }
+      if (inLength == 0) {
+        return STATUS_ERROR;
+      }
     }
 
     byte offset = 1;
@@ -287,9 +331,6 @@ MFRC522_I2C::StatusCode MFRC522_I2C_Extended::TCL_Transceive(
     const byte infLength =
         inLength > offset ? static_cast<byte>(inLength - offset) : 0;
     if (is_s_block_wtx(inBuffer[0], infLength, inBuffer + offset)) {
-      // Mirror the card's WTXM value back in an S(WTX) response and keep the
-      // current I-block state intact. ISO-DEP wait-state exchanges are
-      // supervisory blocks, not completed I/R data exchanges.
       current.prologue.pcb = static_cast<byte>(0xF2 | (hasCid ? 0x08 : 0x00));
       current.prologue.cid = hasCid ? inBuffer[1] : 0x00;
       current.prologue.nad = 0x00;
